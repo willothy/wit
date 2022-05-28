@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::path::{ Path, PathBuf };
 use std::fs;
 
@@ -8,6 +9,16 @@ pub enum WitErrorType {
     DebugError,
     IOError,
     RepoCreationError
+}
+
+impl Display for WitErrorType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            WitErrorType::DebugError => write!(f, "DebugError"),
+            WitErrorType::IOError => write!(f, "IOError"),
+            WitErrorType::RepoCreationError => write!(f, "RepoCreationError"),
+        }
+    }
 }
 
 pub struct WitError {
@@ -21,6 +32,12 @@ impl WitError {
             error: error_type,
             message
         }
+    }
+}
+
+impl Display for WitError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {}", self.error, self.message)
     }
 }
 
@@ -50,7 +67,9 @@ mod WitErrorBuilder {
     }
 
     pub fn from_error(error: &dyn Error) -> String {
-        format!("{}", error)
+        //format!("{}", error)
+        println!("{}", error);
+        error.to_string()
     }
 }
 
@@ -80,8 +99,14 @@ impl Repository {
                 git_dir: git_dir,
                 conf: config
             })
+        } else if !force {
+            return Err(repo_creation_error(format!("Could not create repository in {}", path)))
         } else {
-            Err(repo_creation_error(format!("Could not create repository in {}", path)))
+            Ok(Repository {
+                worktree: PathBuf::from(path),
+                git_dir: git_dir,
+                conf: config
+            })
         }
     }
 
@@ -95,7 +120,7 @@ impl Repository {
 
     fn repo_file(repo: &Repository, paths: Vec<&str>, mkdir: bool) -> Result<PathBuf, WitError> {
         let dirs = if paths.len() > 0 {
-            paths[..paths.len()-2].to_vec()
+            paths[0..paths.len()-1].to_vec()
         } else {
             Vec::new()
         };
@@ -124,14 +149,22 @@ impl Repository {
         }
     }
 
-    fn repo_create(path: &str) -> Result<Self, WitError> {
+    pub fn repo_create(path: &str) -> Result<Self, WitError> {
         let repo = Self::new(path, true)?;
 
         if repo.worktree.exists() {
             if !repo.worktree.is_dir() {
                 return Err(repo_creation_error(format!("{} is not a directory.", path)))
             }
-            if let Some(_) = fs::read_dir(path).iter().next() {
+            if !repo.worktree.read_dir().map(|mut i| i.next().is_none()).unwrap_or(false) {
+                //println!("{}", fs::read_dir(path).unwrap().nth(0).unwrap().unwrap().file_name().to_str().unwrap());
+               /* let it = fs::read_dir(path).unwrap().;
+                loop {
+                    match it.next() {
+                        Some(data) => println!("{}", data),
+                        None => break
+                    }
+                }*/
                 return Err(repo_creation_error(format!("Directory {} is not empty.", path)))
             }
         } else {
@@ -150,14 +183,26 @@ impl Repository {
             return Err(repo_creation_error(from_error(&err)))
         }
 
-        if let Err(err) = fs::write(Self::repo_file(&repo, vec!["config"], true)?, Self::repo_default_config().as_str()) {
+        /*if let Err(err) = fs::write(Self::repo_file(&repo, vec!["config"], true)?, Self::repo_default_config().as_str()) {
+            return Err(repo_creation_error(from_error(&err)))
+        }*/
+        if let Err(err) = Self::repo_default_config().write(
+            match Self::repo_file(&repo, vec!["config"], true)?.to_str() {
+                Some(path) => path,
+                None => return Err(repo_creation_error(format!("Error opening config file.")))
+            }
+        ) {
             return Err(repo_creation_error(from_error(&err)))
         }
 
         Ok(repo)
     }
 
-    fn repo_default_config() -> String {
-        String::new()
+    fn repo_default_config() -> Ini {
+        let mut config = Ini::new();
+        config.set("core", "repositoryformatversion", Some(String::from("0")));
+        config.set("core", "filemode", Some(String::from("false")));
+        config.set("core", "bare", Some(String::from("false")));
+        config
     }
 }
