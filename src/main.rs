@@ -1,14 +1,10 @@
 use clap::{arg, command, SubCommand, Command, Arg };
 use std::path::Path;
 
-mod lib;
-use lib::Repository;
+pub mod repository;
+pub mod error;
 
-/* .subcommand(
-    Command::new("add")
-    .about("") // TODO: Add description
-    .arg(arg!([file]))
-)*/
+use repository::Repository;
 
 pub fn main() {
     let matches = Command::new("wit")

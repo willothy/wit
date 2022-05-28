@@ -1,77 +1,8 @@
-use std::fmt::Display;
-use std::path::{ Path, PathBuf };
+use std::path::{PathBuf, Path};
 use std::fs;
 
 use ini::configparser::ini::Ini;
-use self::WitErrorBuilder::*;
-
-pub enum WitErrorType {
-    DebugError,
-    IOError,
-    RepoCreationError
-}
-
-impl Display for WitErrorType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            WitErrorType::DebugError => write!(f, "DebugError"),
-            WitErrorType::IOError => write!(f, "IOError"),
-            WitErrorType::RepoCreationError => write!(f, "RepoCreationError"),
-        }
-    }
-}
-
-pub struct WitError {
-    error: WitErrorType,
-    message: String
-}
-
-impl WitError {
-    pub fn new(error_type: WitErrorType, message: String) -> Self {
-        WitError {
-            error: error_type,
-            message
-        }
-    }
-}
-
-impl Display for WitError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {}", self.error, self.message)
-    }
-}
-
-mod WitErrorBuilder {
-    use std::error::Error;
-    use super::{WitError, WitErrorType::*};
-    // For debug use only
-    pub fn generic_error() -> WitError {
-        WitError {
-            error: DebugError,
-            message: String::from("Generic debug error.")
-        }
-    }
-
-    pub fn io_error(message: String) -> WitError {
-        WitError {
-            error: IOError,
-            message
-        }
-    }
-
-    pub fn repo_creation_error(message: String) -> WitError {
-        WitError {
-            error: RepoCreationError,
-            message
-        }
-    }
-
-    pub fn from_error(error: &dyn Error) -> String {
-        //format!("{}", error)
-        println!("{}", error);
-        error.to_string()
-    }
-}
+use crate::error::{WitErrorBuilder::*, WitError};
 
 pub struct Repository {
     pub worktree: PathBuf,
@@ -157,14 +88,6 @@ impl Repository {
                 return Err(repo_creation_error(format!("{} is not a directory.", path)))
             }
             if !repo.worktree.read_dir().map(|mut i| i.next().is_none()).unwrap_or(false) {
-                //println!("{}", fs::read_dir(path).unwrap().nth(0).unwrap().unwrap().file_name().to_str().unwrap());
-               /* let it = fs::read_dir(path).unwrap().;
-                loop {
-                    match it.next() {
-                        Some(data) => println!("{}", data),
-                        None => break
-                    }
-                }*/
                 return Err(repo_creation_error(format!("Directory {} is not empty.", path)))
             }
         } else {
@@ -172,7 +95,7 @@ impl Repository {
                 return Err(repo_creation_error(from_error(&e)))
             }
         }
-        
+
         // .git/description
         if let Err(err) = fs::write(Self::repo_file(&repo, vec!["description"], true)?, "Unnamed repository; edit this file 'description' to name the repository.\n") {
             return Err(repo_creation_error(from_error(&err)))
@@ -183,9 +106,7 @@ impl Repository {
             return Err(repo_creation_error(from_error(&err)))
         }
 
-        /*if let Err(err) = fs::write(Self::repo_file(&repo, vec!["config"], true)?, Self::repo_default_config().as_str()) {
-            return Err(repo_creation_error(from_error(&err)))
-        }*/
+        // .git/config
         if let Err(err) = Self::repo_default_config().write(
             match Self::repo_file(&repo, vec!["config"], true)?.to_str() {
                 Some(path) => path,
