@@ -4,46 +4,14 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-        /*{
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug unit tests in library 'wit'",
-            "cargo": {
-                "args": [
-                    "test",
-                    "--no-run",
-                    "--lib",
-                    "--package=wit"
-                ],
-                "filter": {
-                    "name": "wit",
-                    "kind": "lib"
-                }
-            },
-            "args": [
-                "init",
-                "/home/willothy/Projects/wit_test/test1/"
-            ],
-            "cwd": "${workspaceFolder}"
-        },
         {
-            "type": "lldb",
+            "type": "by-gdb",
             "request": "launch",
-            "name": "Debug executable 'wit'",
-            "cargo": {
-                "args": [
-                    "build",
-                    "--bin=wit",
-                    "--package=wit"
-                ],
-                "filter": {
-                    "name": "wit",
-                    "kind": "bin"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
-        }*/
+            "name": "Launch(gdb)",
+            "program": "target/debug/wit",
+            "programArgs": "init ./test_repo/",
+            "cwd": "${workspaceRoot}"
+        },
         {
             "type": "lldb",
             "request": "launch",
@@ -53,12 +21,11 @@
                     "run",
                     "--",
                     "init",
-                    "/home/willothy/Projects/wit_test/test1/"
+                    "./test_repo/"
                 ]
             },
             "args": [
-                //"init",
-                //"/home/willothy/Projects/wit_test/test1/"
+
             ],
             "cwd": "${workspaceFolder}"
         }
