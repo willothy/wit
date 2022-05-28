@@ -1,13 +1,15 @@
-use clap::{arg, command, SubCommand, Command, Arg };
-use std::path::Path;
+use std::error::Error;
 
-pub mod repository;
-pub mod error;
+use clap::{arg, Command };
 
-use repository::Repository;
+mod repository;
+mod error;
+mod cli;
 
-pub fn main() {
-    let matches = Command::new("wit")
+use error::builder::*;
+
+pub fn main() -> Result<(), Box<dyn Error>> {
+    let command = Command::new("wit")
         .version(env!("CARGO_PKG_VERSION"))
         .author("Will Hopkins <willothyh@gmail.com>")
         .about("'Write your self a git' implemented in Rust.")
@@ -16,23 +18,18 @@ pub fn main() {
         .arg_required_else_help(true)
         .subcommand(
             Command::new("init")
-            .about("Creates a new git repository")
-            .arg_required_else_help(true)
+            .about("Create a new git repository")
             .arg(
                 arg!([path])
             )
         )
         .get_matches();
 
-    match matches.subcommand() {
-        Some(("init", sub_matches)) => {
-            if let Err(e) = Repository::repo_create(sub_matches.value_of("path").unwrap()) {
-                println!("{}", e);
-                eprintln!("Could not create repo.");
-            }
-        },
+    match command.subcommand() {
+        Some(("init", sub_matches)) => cli::init(sub_matches),
         _ => {
-            eprintln!("bruh");
+            eprintln!("Unknown command");
+            return Err(Box::new(io_error(String::from("Unknown command"))))
         }
     }
 }

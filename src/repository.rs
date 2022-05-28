@@ -2,7 +2,7 @@ use std::path::{PathBuf, Path};
 use std::fs;
 
 use ini::configparser::ini::Ini;
-use crate::error::{WitErrorBuilder::*, WitError};
+use crate::error::{builder::*, WitError};
 
 pub struct Repository {
     pub worktree: PathBuf,
@@ -95,6 +95,11 @@ impl Repository {
                 return Err(repo_creation_error(from_error(&e)))
             }
         }
+
+        Self::repo_dir(&repo, vec!["branches"], true)?;
+        Self::repo_dir(&repo, vec!["objects"], true)?;
+        Self::repo_dir(&repo, vec!["refs", "tags"], true)?;
+        Self::repo_dir(&repo, vec!["refs", "heads"], true)?;
 
         // .git/description
         if let Err(err) = fs::write(Self::repo_file(&repo, vec!["description"], true)?, "Unnamed repository; edit this file 'description' to name the repository.\n") {

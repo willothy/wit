@@ -1,5 +1,7 @@
 use std::fmt::Display;
+use std::error::Error;
 
+#[derive(Debug, Clone)]
 pub enum WitErrorType {
     DebugError,
     IOError,
@@ -16,10 +18,13 @@ impl Display for WitErrorType {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct WitError {
     error: WitErrorType,
     message: String
 }
+
+impl Error for WitError {}
 
 impl WitError {
     pub fn new(error_type: WitErrorType, message: String) -> Self {
@@ -36,34 +41,25 @@ impl Display for WitError {
     }
 }
 
-pub mod WitErrorBuilder {
+pub mod builder {
     use std::error::Error;
     use super::{WitError, WitErrorType::*};
+
     // For debug use only
-    pub fn generic_error() -> WitError {
-        WitError {
-            error: DebugError,
-            message: String::from("Generic debug error.")
-        }
+    #[allow(dead_code)]
+    pub fn debug_error() -> WitError {
+        WitError::new(DebugError, String::from("Generic debug error."))
     }
 
     pub fn io_error(message: String) -> WitError {
-        WitError {
-            error: IOError,
-            message
-        }
+        WitError::new(IOError, message)
     }
 
     pub fn repo_creation_error(message: String) -> WitError {
-        WitError {
-            error: RepoCreationError,
-            message
-        }
+        WitError::new(RepoCreationError, message)
     }
 
     pub fn from_error(error: &dyn Error) -> String {
-        //format!("{}", error)
-        println!("{}", error);
         error.to_string()
     }
 }
