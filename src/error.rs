@@ -5,7 +5,8 @@ use std::error::Error;
 pub enum WitErrorType {
     DebugError,
     IOError,
-    RepoCreationError
+    RepoCreationError,
+    InheritedError
 }
 
 impl Display for WitErrorType {
@@ -14,6 +15,7 @@ impl Display for WitErrorType {
             WitErrorType::DebugError => write!(f, "DebugError"),
             WitErrorType::IOError => write!(f, "IOError"),
             WitErrorType::RepoCreationError => write!(f, "RepoCreationError"),
+            WitErrorType::InheritedError => write!(f, "InheritedError"),
         }
     }
 }
@@ -21,7 +23,7 @@ impl Display for WitErrorType {
 #[derive(Debug, Clone)]
 pub struct WitError {
     error: WitErrorType,
-    message: String
+    message: String,
 }
 
 impl Error for WitError {}
@@ -35,6 +37,12 @@ impl WitError {
     }
 }
 
+impl From<std::io::Error> for WitError {
+    fn from(err: std::io::Error) -> Self {
+        WitError::new(WitErrorType::InheritedError, err.to_string())
+    }
+}
+
 impl Display for WitError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}: {}", self.error, self.message)
@@ -42,24 +50,19 @@ impl Display for WitError {
 }
 
 pub mod builder {
-    use std::error::Error;
     use super::{WitError, WitErrorType::*};
 
     // For debug use only
     #[allow(dead_code)]
-    pub fn debug_error() -> WitError {
-        WitError::new(DebugError, String::from("Generic debug error."))
+    pub fn debug_error() -> Box<WitError> {
+        Box::new(WitError::new(DebugError, String::from("Generic debug error.")))
     }
 
-    pub fn io_error(message: String) -> WitError {
-        WitError::new(IOError, message)
+    pub fn io_error(message: String) -> Box<WitError> {
+        Box::new(WitError::new(IOError, message))
     }
 
-    pub fn repo_creation_error(message: String) -> WitError {
-        WitError::new(RepoCreationError, message)
-    }
-
-    pub fn from_error(error: &dyn Error) -> String {
-        error.to_string()
+    pub fn repo_creation_error(message: String) -> Box<WitError> {
+        Box::new(WitError::new(RepoCreationError, message))
     }
 }
