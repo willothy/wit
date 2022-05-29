@@ -1,56 +1,33 @@
 
-pub mod execution {
-    use clap::{Command};
-    use crate::error::{builder::io_error, WitError};
+use clap::Command;
+use crate::error::{builder::io_error, WitError};
+use crate::commands;
 
-    pub trait CliExecute<'a> {
-        fn execute(self) -> Result<(), Box<WitError>>;
-    }
+pub trait CliExecute<'a> {
+    fn execute(self) -> Result<(), Box<WitError>>;
+}
 
-    impl<'a> CliExecute<'a> for Command<'a> {
-        fn execute(self) -> Result<(), Box<WitError>> {
-            match self.get_matches().subcommand() {
-                Some(("init", args)) => super::commands::init(args),
-                _ => {
-                    eprintln!("Unknown command");
-                    return Err(io_error(String::from("Unknown command")))
-                }
+impl<'a> CliExecute<'a> for Command<'a> {
+    fn execute(self) -> Result<(), Box<WitError>> {
+        match self.get_matches().subcommand() {
+            Some(("init", args)) => commands::init(args),
+            Some(("cat-file", args)) => commands::cat_file(args),
+            Some((invalid_cmd, _)) => {
+                return Err(io_error(format!("Unknown command {}", invalid_cmd)))
+            }
+            None => {
+                return Err(io_error(format!("No command specified")))
             }
         }
     }
-
-    pub fn setup<'a>() -> Command<'a> {
-        Command::new("wit")
-            .version(env!("CARGO_PKG_VERSION"))
-            .author("Will Hopkins <willothyh@gmail.com>")
-            .about("'Write your self a git' implemented in Rust.")
-            .propagate_version(true)
-            .subcommand_required(true)
-            .arg_required_else_help(true)
-    }
 }
 
-pub mod commands {
-    use std::{env::current_dir};
-    use clap::ArgMatches;
-    use crate::{error::{builder::*, WitError}, repository::Repository};
-
-    pub fn init(sub_matches: &ArgMatches) -> Result<(), Box<WitError>> {
-        let pwd = match current_dir() {
-            Ok(dir) => dir,
-            Err(_) => return Err(io_error(String::from("Could not find pwd")))
-        };
-        let pwd = match pwd.to_str() {
-            Some(string) => {
-                String::from(string)
-            },
-            None => return Err(io_error(String::from("Could not read pwd")))
-        };
-
-        if let Err(e) = Repository::repo_create(sub_matches.value_of("path").unwrap_or(pwd.as_str())) {
-            println!("{}", e);
-            eprintln!("Could not create repo.");
-        }
-        Ok(())
-    }
+pub fn setup<'a>() -> Command<'a> {
+    Command::new("wit")
+    .version(env!("CARGO_PKG_VERSION"))
+    .author("Will Hopkins <willothyh@gmail.com>")
+    .about("'Write Yourself a Git' implemented in Rust.")
+    .propagate_version(true)
+    .subcommand_required(true)
+    .arg_required_else_help(true)
 }

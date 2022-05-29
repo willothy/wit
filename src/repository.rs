@@ -4,6 +4,7 @@ use std::fs;
 use ini::configparser::ini::Ini;
 use crate::error::{builder::*, WitError};
 
+#[derive(Debug, Clone)]
 pub struct Repository {
     pub worktree: PathBuf,
     pub git_dir: PathBuf,
