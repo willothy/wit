@@ -1,14 +1,14 @@
 
 pub mod execution {
-    use clap::{Command, arg};
+    use clap::{Command};
     use crate::error::{builder::io_error, WitError};
 
     pub trait CliExecute<'a> {
-        fn execute(&self) -> Result<(), Box<WitError>>;
+        fn execute(self) -> Result<(), Box<WitError>>;
     }
 
     impl<'a> CliExecute<'a> for Command<'a> {
-        fn execute(&self) -> Result<(), Box<WitError>> {
+        fn execute(self) -> Result<(), Box<WitError>> {
             match self.get_matches().subcommand() {
                 Some(("init", args)) => super::commands::init(args),
                 _ => {

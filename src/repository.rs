@@ -25,20 +25,57 @@ impl Repository {
                 Some(string) => string,
                 None => return Err(repo_creation_error(format!("Could not load config from {:?}", config_path)))
             }).unwrap();
-            Ok(Repository {
-                worktree: PathBuf::from(path),
-                git_dir: git_dir,
-                conf: config
-            })
         } else if !force {
             return Err(repo_creation_error(format!("Could not create repository in {}", path)))
-        } else {
-            Ok(Repository {
-                worktree: PathBuf::from(path),
-                git_dir: git_dir,
-                conf: config
-            })
         }
+
+        if !force {
+            let version = config
+                .get("core", "repositoryformatversion")
+                .ok_or(
+                    version_mismatch_error(format!("Could not read repository format version from config."))
+                )?.parse::<i32>()?;
+            if version != 0 {
+                return Err(version_mismatch_error(format!("Unsupported repositoryformatversion {}", version)))
+            }
+        }
+        Ok(Repository {
+            worktree: PathBuf::from(path),
+            git_dir: git_dir,
+            conf: config
+        })
+    }
+
+    pub fn repo_find(path: &str, required: bool) -> Result<Option<Repository>, Box<WitError>> {
+        let path = fs::canonicalize(path)?;
+
+        if path.join(".git").is_dir() {
+            return Ok(
+                Some(
+                    Repository::new(
+                        path
+                            .to_str()
+                            .ok_or(path_conversion_error())?,
+                        false
+                    )?
+                )
+            )
+        }
+
+        let parent = fs::canonicalize(path.join(".."))?;
+
+        if parent == path {
+            if required {
+                return Err(io_error(format!("No git directory in {:?}", path)))
+            } else {
+                return Ok(None)
+            }
+        }
+
+        Self::repo_find(
+            parent.to_str().ok_or(path_conversion_error())?,
+            required
+        )
     }
 
     pub fn repo_path(base: &Repository, paths: Vec<&str>) -> PathBuf {
@@ -73,7 +110,7 @@ impl Repository {
         } else if mkdir {
             match fs::create_dir_all(&path) {
                 Ok(_) => Ok(path),
-                Err(e) => Err(Box::new(WitError::from(e)))
+                Err(err) => Err(Box::<WitError>::from(err))
             }
         } else {
             Err(io_error(format!("Failed to create {:?}", path)))
@@ -92,7 +129,7 @@ impl Repository {
             }
         } else {
             if let Err(e) = fs::create_dir_all(&repo.worktree) {
-                return Err(Box::new(WitError::from(e)))
+                return Err(Box::<WitError>::from(e))
             }
         }
 
@@ -103,12 +140,12 @@ impl Repository {
 
         // .git/description
         if let Err(err) = fs::write(Self::repo_file(&repo, vec!["description"], true)?, "Unnamed repository; edit this file 'description' to name the repository.\n") {
-            return Err(Box::new(WitError::from(err)))
+            return Err(Box::<WitError>::from(err))
         }
 
         // .git/HEAD
         if let Err(err) = fs::write(Self::repo_file(&repo, vec!["HEAD"], true)?, "ref: refs/heads/main\n") {
-            return Err(Box::new(WitError::from(err)))
+            return Err(Box::<WitError>::from(err))
         }
 
         // .git/config
@@ -117,7 +154,7 @@ impl Repository {
                 .to_str()
                 .ok_or(repo_creation_error(format!("Error opening config file.")))?
         ) {
-            return Err(Box::new(WitError::from(err)))
+            return Err(Box::<WitError>::from(err))
         }
 
         Ok(repo)
