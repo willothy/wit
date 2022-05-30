@@ -76,7 +76,19 @@ pub fn main() -> Result<(), Box<WitError>> {
                 .required(true)
                 .help("Read the object from <file>")
                 .display_order(2)
-            )
+            ),
+            // log
+            Command::new("log")
+            .display_order(3)
+            .about("Display history of a given commit")
+            .arg(
+                arg!([commit])
+                .required(false)
+                .default_value("HEAD")
+                .display_order(0)
+                //.multiple_occurrences(true)
+                .help("Commit to start at")
+            ),
         ])
         .execute()
 }

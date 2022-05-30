@@ -12,11 +12,13 @@ impl<'a> CliExecute<'a> for Command<'a> {
         match self.get_matches().subcommand() {
             Some(("init", args)) => commands::init(args),
             Some(("cat-file", args)) => commands::cat_file(args),
+            Some(("hash-object", args)) => commands::hash_object(args),
+            Some(("log", args)) => commands::log(args),
             Some((invalid_cmd, _)) => {
-                return Err(io_error(format!("Unknown command {}", invalid_cmd)))
+                Err(io_error(format!("Unknown command {}", invalid_cmd)))
             }
             None => {
-                return Err(io_error(format!("No command specified")))
+                Err(io_error(format!("No command specified")))
             }
         }
     }

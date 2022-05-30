@@ -1,6 +1,6 @@
 use std::{env::current_dir, io::{stdout, Write}, fs, str::from_utf8};
 use clap::ArgMatches;
-use crate::{error::{builder::*, WitError}, repository::Repository, object};
+use crate::{error::{builder::*, WitError}, repository::{Repository, self}, object};
 
 pub fn init(sub_matches: &ArgMatches) -> Result<(), Box<WitError>> {
     let pwd = match current_dir() {
@@ -57,5 +57,10 @@ pub fn hash_object(args: &ArgMatches) -> Result<(), Box<WitError>> {
         repo
     );
     println!("{sha:?}");
+    Ok(())
+}
+
+pub fn log(args: &ArgMatches) -> Result<(), Box<WitError>> {
+    let repo = Repository::repo_find(".", true);
     Ok(())
 }
