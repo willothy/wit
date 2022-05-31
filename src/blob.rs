@@ -1,13 +1,13 @@
 use crate::{object::Object, repository::Repository};
 
 
-pub struct Blob {
-    repo: Option<Repository>,
+pub struct Blob<'a> {
+    repo: Option<&'a Repository>,
     blobdata: Vec<u8>,
 }
 
-impl Blob {
-    pub fn new(repo: Option<Repository>, data: Vec<u8>) -> Self {
+impl<'a> Blob<'a> {
+    pub fn new(repo: Option<&'a Repository>, data: Vec<u8>) -> Self {
         Self {
             repo: repo,
             blobdata: data,
@@ -15,7 +15,7 @@ impl Blob {
     }
 }
 
-impl Object for Blob {
+impl<'a> Object for Blob<'a> {
     fn serialize(&self) -> Vec<u8> {
         self.blobdata.clone()
     }
@@ -28,7 +28,7 @@ impl Object for Blob {
         b"blob".to_vec()
     }
 
-    fn repo(&self) -> Option<Repository> {
-        self.repo.clone()
+    fn repo(&self) -> Option<&'a Repository> {
+        self.repo
     }
 }

@@ -12,7 +12,9 @@ pub enum WitErrorType {
     VersionMismatchError,
     MalformedObjectError,
     UnknownObjectTypeError,
-    PathConversionError
+    PathConversionError,
+    CLIArgumentError,
+    UTF8ConversionError,
 }
 
 impl Display for WitErrorType {
@@ -21,7 +23,7 @@ impl Display for WitErrorType {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct WitError {
     error: WitErrorType,
     message: String,
@@ -38,6 +40,7 @@ impl WitError {
     }
 }
 
+// Conversions for WitError
 impl From<std::io::Error> for WitError {
     fn from(err: std::io::Error) -> Self {
         WitError::new(WitErrorType::InheritedError, err.to_string())
@@ -101,5 +104,17 @@ pub mod builder {
 
     pub fn path_conversion_error() -> Box<WitError> {
         Box::new(WitError::new(MalformedObjectError, format!("Could not convert path to string")))
+    }
+
+    pub fn cli_argument_error(message: String) -> Box<WitError> {
+        Box::new(WitError::new(CLIArgumentError, message))
+    }
+
+    pub fn unknown_object_error(message: String) -> Box<WitError> {
+        Box::new(WitError::new(UnknownObjectTypeError, message))
+    }
+
+    pub fn utf8_error(message: String) -> Box<WitError> {
+        Box::new(WitError::new(UTF8ConversionError, message))
     }
 }

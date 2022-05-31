@@ -1,20 +1,27 @@
 use std::{env::current_dir, io::{stdout, Write}, fs, str::from_utf8};
 use clap::ArgMatches;
-use crate::{error::{builder::*, WitError}, repository::{Repository, self}, object};
+use crate::{
+    error::{
+        builder::*,
+        WitError
+    },
+    repository::Repository,
+    object
+};
 
 pub fn init(sub_matches: &ArgMatches) -> Result<(), Box<WitError>> {
     let pwd = match current_dir() {
         Ok(dir) => dir,
-        Err(_) => return Err(io_error(String::from("Could not find pwd")))
+        Err(_) => Err(io_error(String::from("Could not find pwd")))?
     };
     let pwd = match pwd.to_str() {
         Some(string) => {
             String::from(string)
         },
-        None => return Err(io_error(String::from("Could not read pwd")))
+        None => Err(io_error(String::from("Could not read pwd")))?
     };
 
-    if let Err(e) = Repository::repo_create(sub_matches.value_of("path").unwrap_or(pwd.as_str())) {
+    if let Err(e) = Repository::create(sub_matches.value_of("path").unwrap_or(pwd.as_str())) {
         println!("{}", e);
         eprintln!("Could not create repo.");
     }
@@ -22,27 +29,30 @@ pub fn init(sub_matches: &ArgMatches) -> Result<(), Box<WitError>> {
 }
 
 pub fn cat_file(args: &ArgMatches) -> Result<(), Box<WitError>> {
-    let repo: Repository = Repository::repo_find(".", true)?
+    let repo: Repository = Repository::find(".", true)?
         .ok_or(io_error(format!("No such repository {}.", args.value_of("object").unwrap_or(""))))?;
+    
+    let data = object::find(
+        &repo,
+        args.value_of("object").ok_or(io_error(format!("No object specified")))?,
+        Some(args.value_of("file_type").ok_or(io_error(format!("No file type specified")))?),
+        true
+    );
     let obj = object::read(
-        repo,
-        object::find(
-            // &mut repo,
-            args.value_of("object").ok_or(io_error(format!("No object specified")))?,
-            args.value_of("file_type").ok_or(io_error(format!("No file type specified")))?,
-            true
-        ).as_str()
+        &repo,
+        data.as_str()
     )?;
 
     let mut out = stdout();
-    out.write(&obj.serialize()[..])?;
+    out.write(obj.serialize().as_slice())?;
     out.flush()?;
     Ok(())
 }
 
 pub fn hash_object(args: &ArgMatches) -> Result<(), Box<WitError>> {
+    let r = Repository::new(".", false)?;
     let repo = if args.is_present("write") {
-        Some(Repository::new(".", false)?)
+        Some(&r)
     } else {
         None
     };
@@ -61,6 +71,14 @@ pub fn hash_object(args: &ArgMatches) -> Result<(), Box<WitError>> {
 }
 
 pub fn log(args: &ArgMatches) -> Result<(), Box<WitError>> {
-    let repo = Repository::repo_find(".", true);
+    let commit = args.value_of("commit").ok_or(cli_argument_error("No commit specified".to_owned()))?;
+    let repo = Repository::find(".", true)?.unwrap();
+    println!("digraph log {{\n");
+    object::graphviz(
+        &repo,
+        object::find(&repo, commit, None, true),
+        &mut Vec::new()
+    )?;
+    println!("}}");
     Ok(())
 }
