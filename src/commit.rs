@@ -1,4 +1,4 @@
-use crate::{object::Object, repository::Repository};
+use crate::{object::Object, repository::Repository, error::WitError};
 
 use self::kvlm::{KVLMExt, KVLM};
 
@@ -25,8 +25,9 @@ impl<'a> Object for Commit<'a> {
         self.kvlm.serialize().as_bytes().to_vec()
     }
 
-    fn deserialize(&mut self, data: Vec<u8>) {
+    fn deserialize(&mut self, data: Vec<u8>) -> Result<(), Box<WitError>> {
         self.kvlm = kvlm::KVLM::create(data, 0);
+        Ok(())
     }
 
     fn fmt(&self) -> Vec<u8> {
@@ -57,8 +58,8 @@ pub mod kvlm {
         }
 
         fn parse(&mut self, raw: Vec<u8>, start: usize) -> KVLM {
-            let spc: Option<usize> = raw.find_some(start, b' ');
-            let nl: usize = raw.find_exact(start, b'\n');
+            let spc: Option<usize> = raw.find_some(b' ', start);
+            let nl: usize = raw.find_exact(b'\n', start);
 
             let spc = {
                 // Scope for shadowing spc and nl as isizes and extracting spc as usize
@@ -84,7 +85,7 @@ pub mod kvlm {
 
             let mut end = start;
             loop {
-                end = match raw.find_some(end+1, b'\n') {
+                end = match raw.find_some(b'\n', end+1) {
                     Some(new_line) => new_line,
                     None => break
                 };

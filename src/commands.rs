@@ -1,12 +1,12 @@
-use std::{env::current_dir, io::{stdout, Write}, fs, str::from_utf8};
-use clap::ArgMatches;
+use std::{env::current_dir, io::{stdout, Write}, fs, str::from_utf8, path::PathBuf};
+use clap::{ArgMatches, Arg};
 use crate::{
     error::{
         builder::*,
         WitError
     },
     repository::Repository,
-    object
+    object::{self, WitObject}, tree::{Tree, self}
 };
 
 pub fn init(sub_matches: &ArgMatches) -> Result<(), Box<WitError>> {
@@ -80,5 +80,66 @@ pub fn log(args: &ArgMatches) -> Result<(), Box<WitError>> {
         &mut Vec::new()
     )?;
     println!("}}");
+    Ok(())
+}
+
+pub fn ls_tree(args: &ArgMatches) -> Result<(), Box<WitError>> {
+    let repo = Repository::find(".", true)?.ok_or(debug_error())?;
+    let obj_name = args.value_of("object").ok_or(debug_error())?;
+    let obj = match object::read(&repo, &object::find(&repo, obj_name, Some("tree"), true))? {
+        WitObject::TreeObject(tree) => tree,
+        _ => Err(malformed_object_error(format!("Object {} is not a tree", obj_name)))?
+    };
+
+    let mut mode_str = String::new();
+    for leaf in obj.leaves() {
+        mode_str.clear();
+        for _ in 0..(6 - leaf.mode().len()) {
+            mode_str.push('0');
+        }
+        mode_str.push_str(leaf.mode());
+
+        println!(
+            "{} {} {}\t{}",
+            mode_str,
+            String::from_utf8(object::read(&repo, leaf.sha())?.serialize())?,
+            leaf.sha(),
+            leaf.path().to_str().unwrap()
+        );
+    }
+    Ok(())
+}
+
+
+pub fn checkout(args: &ArgMatches) -> Result<(), Box<WitError>> {
+    let repo = Repository::find(".", true)?.ok_or(debug_error())?;
+    let obj_name = args.value_of("commit").ok_or(debug_error())?;
+    let obj: Tree = match object::read(&repo, &object::find(&repo, obj_name, Some("tree"), true))? {
+        WitObject::CommitObject(commit) => {
+            match object::read(
+                &repo,
+                &commit.kvlm.get("tree").ok_or(debug_error())?[0]
+            )? {
+                WitObject::TreeObject(tree) => tree,
+                _ => Err(malformed_object_error(format!("Could not find tree from object {}", obj_name)))?
+            }
+        },
+        WitObject::TreeObject(tree) => tree,
+        other => Err(malformed_object_error(format!("Expected a commit or tree object, got {}", from_utf8(&other.fmt()).unwrap_or("?"))))?
+    };
+
+    let path = PathBuf::from(args.value_of("path").ok_or(debug_error())?);
+    if path.exists() {
+        if !path.is_dir() {
+            Err(debug_error())?
+        }
+        if !path.read_dir()?.next().is_none() {
+            Err(debug_error())?
+        }
+    } else {
+        fs::create_dir_all(args.value_of("path").ok_or(debug_error())?)?;
+    }
+
+    object::checkout(&repo, &obj, &path.canonicalize()?)?;
     Ok(())
 }

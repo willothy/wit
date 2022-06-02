@@ -1,4 +1,4 @@
-use crate::{object::Object, repository::Repository};
+use crate::{object::Object, repository::Repository, error::WitError};
 
 
 pub struct Blob<'a> {
@@ -13,6 +13,10 @@ impl<'a> Blob<'a> {
             blobdata: data,
         }
     }
+
+    pub fn data(&self) -> &Vec<u8> {
+        &self.blobdata
+    }
 }
 
 impl<'a> Object for Blob<'a> {
@@ -20,8 +24,9 @@ impl<'a> Object for Blob<'a> {
         self.blobdata.clone()
     }
 
-    fn deserialize(&mut self, data: Vec<u8>) {
+    fn deserialize(&mut self, data: Vec<u8>) -> Result<(), Box<WitError>> {
         self.blobdata = data;
+        Ok(())
     }
 
     fn fmt(&self) -> Vec<u8> {

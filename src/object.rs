@@ -1,5 +1,6 @@
 use std::io::prelude::*;
 use std::fs;
+use std::path::PathBuf;
 use std::str::from_utf8;
 
 use crypto::digest::Digest;
@@ -12,17 +13,20 @@ use crate::blob::Blob;
 use crate::commit::Commit;
 use crate::error::{WitError, builder::*};
 use crate::repository::Repository;
+use crate::tree::Tree;
 
 pub trait Find<T> {
-    fn find(&self, element: T) -> Result<usize, Box<WitError>>;
+    fn find(&self, element: T) -> Result<usize, Box<WitError>> { self.find_from(element, 0) }
 
-    fn find_some(&self, start: usize, element: T) -> Option<usize>;
+    fn find_from(&self, element: T, start: usize) -> Result<usize, Box<WitError>>;
+
+    fn find_some(&self, element: T, start: usize) -> Option<usize>;
 
     #[allow(unused_variables)]
-    fn find_signed(&self, start: usize, element: T) -> isize {0}
+    fn find_signed(&self, element: T, start: usize) -> isize {0}
 
     #[allow(unused_variables)]
-    fn find_exact(&self, start: usize, element: T) -> usize {0}
+    fn find_exact(&self, element: T, start: usize) -> usize {0}
 }
 
 pub trait Replace {
@@ -34,7 +38,7 @@ impl Replace for Vec<u8> {
         let mut result = Vec::new();
         let mut start = 0;
         loop {
-            let end = match self.find_some(start, from.as_bytes()[0]) {
+            let end = match self.find_some(from.as_bytes()[0], start) {
                 Some(val) => val,
                 None => break
             };
@@ -48,77 +52,77 @@ impl Replace for Vec<u8> {
     }
 }
 
-impl<T: PartialEq + std::fmt::Debug + Default> Find<T> for Vec<T> {
-    fn find(&self, element: T) -> Result<usize, Box<WitError>> {
-        self.iter().position(|el| *el == element).ok_or(
+impl<T: PartialEq + std::fmt::Debug> Find<T> for Vec<T> {
+    fn find_from(&self, element: T, start: usize) -> Result<usize, Box<WitError>> {
+        self.iter().skip(start).position(|el| *el == element).ok_or(
             io_error(format!("{:?} not found.", element))
         )
     }
 
-    fn find_some(&self, start: usize, element: T) -> Option<usize> {
+    fn find_some(&self, element: T, start: usize) -> Option<usize> {
         self.iter().skip(start).position(|el| *el == element)
     }
 
-    fn find_signed(&self, start: usize, element: T) -> isize {
+    fn find_signed(&self, element: T, start: usize) -> isize {
         match self.iter().skip(start).position(|el| *el == element) {
             Some(idx) => idx as isize,
             None => -1
         }
     }
 
-    fn find_exact(&self, start: usize, element: T) -> usize {
+    fn find_exact(&self, element: T, start: usize) -> usize {
         self.iter().skip(start).position(|el| *el == element).unwrap()
     }
 }
 
 pub enum WitObject<'a> {
-    Blob(Blob<'a>),
-    Commit(Commit<'a>),
-    /*Tree(Tree),
-    Tag(Tag)*/
+    BlobObject(Blob<'a>),
+    CommitObject(Commit<'a>),
+    TreeObject(Tree),
+    //Tag(Tag)
 }
 
 impl<'a> WitObject<'a> {
     pub fn serialize(&self) -> Vec<u8> {
         match self {
-            WitObject::Blob(blob) => blob.serialize(),
-            WitObject::Commit(commit) => commit.serialize(),
-            /*WitObject::Tree(tree) => tree.serialize(),
-            WitObject::Tag(tag) => tag.serialize()*/
+            WitObject::BlobObject(blob) => blob.serialize(),
+            WitObject::CommitObject(commit) => commit.serialize(),
+            WitObject::TreeObject(tree) => tree.serialize(),
+            //WitObject::Tag(tag) => tag.serialize()
         }
     }
 
     pub fn deserialize(&mut self, data: Vec<u8>) -> Result<(), Box<WitError>> {
         match self {
-            WitObject::Blob(blob) => Ok(blob.deserialize(data)),
-            WitObject::Commit(commit) => Ok(commit.deserialize(data)),
-            /*WitObject::Tree(tree) => tree.deserialize(data),
-            WitObject::Tag(tag) => tag.deserialize(data)*/
+            WitObject::BlobObject(blob) => blob.deserialize(data),
+            WitObject::CommitObject(commit) => commit.deserialize(data),
+            WitObject::TreeObject(tree) => tree.deserialize(data),
+            //WitObject::Tag(tag) => tag.deserialize(data)
         }
     }
 
     pub fn fmt(&self) -> Vec<u8> {
         match self {
-            WitObject::Blob(blob) => blob.fmt(),
-            WitObject::Commit(commit) => commit.fmt(),
-            /*WitObject::Tree(tree) => tree.fmt(),
-            WitObject::Tag(tag) => tag.fmt()*/
+            WitObject::BlobObject(blob) => blob.fmt(),
+            WitObject::CommitObject(commit) => commit.fmt(),
+            WitObject::TreeObject(tree) => tree.fmt(),
+            //WitObject::Tag(tag) => tag.fmt()
         }
     }
 
     pub fn repo(&self) -> Option<& Repository> {
         match self {
-            WitObject::<'a>::Blob(blob) => blob.repo(),
-            WitObject::<'a>::Commit(commit) => commit.repo(),
-            /*WitObject::Tree(tree) => tree.repo(),
-            WitObject::Tag(tag) => tag.repo()*/
+            WitObject::<'a>::BlobObject(blob) => blob.repo(),
+            WitObject::<'a>::CommitObject(commit) => commit.repo(),
+            WitObject::TreeObject(tree) => tree.repo(),
+            //WitObject::Tag(tag) => tag.repo()
         }
     }
 }
 
 pub trait Object {
     fn serialize(&self) -> Vec<u8>;
-    fn deserialize(&mut self, data: Vec<u8>);
+    fn deserialize(&mut self, data: Vec<u8>) -> Result<(), Box<WitError>>;
 
     fn fmt(&self) -> Vec<u8>;
     fn repo(&self) -> Option<&Repository>;
@@ -177,10 +181,10 @@ pub fn write(obj: WitObject, actually_write: bool) -> Result<String, Box<WitErro
 
 fn build<'a>(fmt: &str, repo: Option<&'a Repository>, data: Vec<u8>) -> Result<WitObject<'a>, Box<WitError>> {
     match fmt {
-        "blob" => Ok(WitObject::Blob(Blob::new(repo, data))),
-        "commit" => Ok(WitObject::Commit(Commit::new(repo))),
-        /*"tree" => Ok(WitObject::Tree(Tree::new(repo, data))),
-        "tag" => Ok(WitObject::Tag(Tag::new(repo, data))),*/
+        "blob" => Ok(WitObject::BlobObject(Blob::new(repo, data))),
+        "commit" => Ok(WitObject::CommitObject(Commit::new(repo))),
+        "tree" => Ok(WitObject::TreeObject(Tree::from(&data)?)),
+        //"tag" => Ok(WitObject::Tag(Tag::new(repo, data))),
         _ => Err(unknown_object_error(format!("Unknown object type {}", fmt)))
     }
 }
@@ -196,7 +200,7 @@ pub fn graphviz(repo: &Repository, sha: String, seen: &mut Vec<String>) -> Resul
 
     seen.push(sha.clone());
     let commit = match self::read(repo, &sha)? {
-        WitObject::Commit(commit) => {
+        WitObject::CommitObject(commit) => {
             match commit.fmt().as_slice() {
                 b"commit" => commit,
                 _ => return Err(malformed_object_error(format!("Malformed commit {}", sha)))
@@ -213,6 +217,27 @@ pub fn graphviz(repo: &Repository, sha: String, seen: &mut Vec<String>) -> Resul
     for parent in parents {
         println!("c_{} -> c_{}", sha, parent);
         graphviz(repo, parent.clone(), seen)?;
+    }
+    Ok(())
+}
+
+pub fn checkout<'a>(repo: &'a Repository, tree: &Tree, path: &PathBuf) -> Result<(), Box<WitError>> {
+    let mut obj: WitObject;
+    let mut dest: PathBuf;
+    for leaf in tree.leaves() {
+        obj = read(repo, &leaf.sha())?;
+        dest = PathBuf::from(path).join(&leaf.path());
+
+        match obj {
+            WitObject::BlobObject(blob) => {
+                fs::write(&dest, blob.data())?;
+            },
+            WitObject::TreeObject(tree) => {
+                fs::create_dir_all(&dest)?;
+                checkout(repo, &tree, &dest)?;
+            },
+            _ => return Err(debug_error())?
+        }
     }
     Ok(())
 }

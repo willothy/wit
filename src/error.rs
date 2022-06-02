@@ -2,6 +2,7 @@ use std::fmt::Display;
 use std::error::Error;
 use std::num::ParseIntError;
 use std::str::Utf8Error;
+use std::string::FromUtf8Error;
 
 #[derive(Debug, Clone)]
 pub enum WitErrorType {
@@ -15,6 +16,7 @@ pub enum WitErrorType {
     PathConversionError,
     CLIArgumentError,
     UTF8ConversionError,
+    InvalidModeLengthError,
 }
 
 impl Display for WitErrorType {
@@ -71,6 +73,12 @@ impl From<Utf8Error> for Box<WitError> {
     }
 }
 
+impl From<FromUtf8Error> for Box<WitError> {
+    fn from(err: FromUtf8Error) -> Self {
+        Box::new(WitError::new(WitErrorType::UTF8ConversionError, err.to_string()))
+    }
+}
+
 impl Display for WitError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}: {}", self.error, self.message)
@@ -116,5 +124,9 @@ pub mod builder {
 
     pub fn utf8_error(message: String) -> Box<WitError> {
         Box::new(WitError::new(UTF8ConversionError, message))
+    }
+
+    pub fn mode_error(length: usize) -> Box<WitError> {
+        Box::new(WitError::new(InvalidModeLengthError, format!("Invalid mode length: {}", length)))
     }
 }

@@ -14,6 +14,7 @@ impl<'a> CliExecute<'a> for Command<'a> {
             Some(("cat-file", args)) => commands::cat_file(args),
             Some(("hash-object", args)) => commands::hash_object(args),
             Some(("log", args)) => commands::log(args),
+            Some(("ls-tree", args)) => commands::ls_tree(args),
             Some((invalid_cmd, _)) => {
                 Err(io_error(format!("Unknown command {}", invalid_cmd)))
             }

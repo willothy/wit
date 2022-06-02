@@ -1,18 +1,20 @@
+use std::process::ExitCode;
+
 use clap::{ Command, arg };
 
 mod repository;
 mod object;
 mod blob;
 mod commit;
+mod tree;
 mod commands;
 mod error;
 mod cli;
 
-use error::WitError;
 use cli::CliExecute;
 
-pub fn main() -> Result<(), Box<WitError>> {
-    cli::setup()
+pub fn main() -> ExitCode {
+    let app = cli::setup()
         .subcommands(vec![
             // init
             Command::new("init")
@@ -89,6 +91,43 @@ pub fn main() -> Result<(), Box<WitError>> {
                 //.multiple_occurrences(true)
                 .help("Commit to start at")
             ),
-        ])
-        .execute()
+            // ls-tree
+            Command::new("ls-tree")
+            .arg_required_else_help(true)
+            .display_order(4)
+            .about("List the contents of a tree object")
+            .arg(
+                arg!([object])
+                .required(true)
+                .help("The tree object to list")
+                .display_order(0)
+            ),
+            // checkout
+            Command::new("checkout")
+            .arg_required_else_help(true)
+            .display_order(5)
+            .about("Checkout a commit, a branch, or a tag")
+            .arg(
+                arg!([commit])
+                .required(true)
+                .default_value("HEAD")
+                .display_order(0)
+                .help("The commit or tree to checkout.")
+            )
+            .arg(
+                arg!([path])
+                .required(true)
+                .default_value("master")
+                .display_order(1)
+                .help("The EMPTY directory to checkout on.")
+            ),
+        ]);
+
+    match app.execute() {
+        Ok(_) => ExitCode::SUCCESS,
+        Err(e) => {
+            println!("{}", e);
+            ExitCode::FAILURE
+        }
+    }
 }
