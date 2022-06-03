@@ -157,7 +157,7 @@ pub fn main() -> ExitCode {
     match app.execute() {
         Ok(_) => ExitCode::SUCCESS,
         Err(e) => {
-            println!("{}", e);
+            println!("{:?}", e);
             ExitCode::FAILURE
         }
     }

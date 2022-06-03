@@ -24,8 +24,8 @@ impl<'a> Tag<'a> {
 }
 
 impl<'a> Object for Tag<'a> {
-    fn serialize(&self) -> Vec<u8> {
-        self.kvlm.serialize().as_bytes().to_vec()
+    fn serialize(&self) -> Result<Vec<u8>, Box<WitError>> {
+        Ok(self.kvlm.serialize().as_bytes().to_vec())
     }
 
     fn deserialize(&mut self, data: Vec<u8>) -> Result<(), Box<WitError>> {

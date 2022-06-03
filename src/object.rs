@@ -87,7 +87,7 @@ pub enum WitObject<'a> {
 }
 
 impl<'a> WitObject<'a> {
-    pub fn serialize(&self) -> Vec<u8> {
+    pub fn serialize(&self) -> Result<Vec<u8>, Box<WitError>> {
         match self {
             WitObject::BlobObject(blob) => blob.serialize(),
             WitObject::CommitObject(commit) => commit.serialize(),
@@ -116,7 +116,7 @@ impl<'a> WitObject<'a> {
 }
 
 pub trait Object {
-    fn serialize(&self) -> Vec<u8>;
+    fn serialize(&self) -> Result<Vec<u8>, Box<WitError>>;
     fn deserialize(&mut self, data: Vec<u8>) -> Result<(), Box<WitError>>;
 
     fn fmt(&self) -> Vec<u8>;
@@ -224,7 +224,7 @@ pub fn resolve(repo: &Repository, name: &str) -> Result<Option<Vec<String>>, Box
 }
 
 pub fn write(obj: WitObject, actually_write: bool) -> Result<String, Box<WitError>> {
-    let data = obj.serialize();
+    let data = obj.serialize()?;
     let mut result = Vec::new();
     result.extend(obj.fmt());
     result.extend(vec![b' ']);

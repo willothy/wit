@@ -50,7 +50,7 @@ pub fn cat_file(args: &ArgMatches) -> Result<(), Box<WitError>> {
     )?;
 
     let mut out = stdout();
-    out.write(obj.serialize().as_slice())?;
+    out.write(obj.serialize()?.as_slice())?;
     out.flush()?;
     Ok(())
 }
@@ -108,7 +108,7 @@ pub fn ls_tree(args: &ArgMatches) -> Result<(), Box<WitError>> {
         println!(
             "{} {} {}\t{}",
             mode_str,
-            String::from_utf8(object::read(&repo, leaf.sha())?.serialize())?,
+            String::from_utf8(object::read(&repo, leaf.sha())?.serialize()?)?,
             leaf.sha(),
             leaf.path().to_str().unwrap()
         );

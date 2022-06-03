@@ -24,8 +24,8 @@ impl<'a> Blob<'a> {
 }
 
 impl<'a> Object for Blob<'a> {
-    fn serialize(&self) -> Vec<u8> {
-        self.blobdata.clone()
+    fn serialize(&self) -> Result<Vec<u8>, Box<WitError>> {
+        Ok(self.blobdata.clone())
     }
 
     fn deserialize(&mut self, data: Vec<u8>) -> Result<(), Box<WitError>> {

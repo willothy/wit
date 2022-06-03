@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::{object::{Find, Object}, error::{WitError, builder::{mode_error, debug_error}}};
+use crate::{object::{Find, Object}, error::{WitError, builder::*}};
 
 pub struct Tree {
     leaves: Vec<Leaf>,
@@ -68,21 +68,23 @@ impl Tree {
 }
 
 impl Object for Tree {
-    fn serialize(&self) -> Vec<u8> {
+    fn serialize(&self) -> Result<Vec<u8>, Box<WitError>> {
         let mut bytes = Vec::<u8>::new();
         bytes.extend(b"");
 
         for leaf in self.leaves() {
             bytes.extend(leaf.mode().as_bytes());
             bytes.push(b' ');
-            bytes.extend(leaf.path().to_str().ok_or(debug_error()).unwrap().as_bytes());
+            bytes.extend(leaf.path().to_str().ok_or(
+                utf8_error(format!("Could not convert {} to str.", leaf.path().to_str().unwrap_or("")))
+            )?.as_bytes());
             bytes.push(b'\x00');
             bytes.extend(
-                u32::from_str_radix(leaf.sha(), 16).unwrap().to_be_bytes().to_vec()
+                u32::from_str_radix(leaf.sha(), 16)?.to_be_bytes().to_vec()
             );
         }
 
-        bytes
+        Ok(bytes)
     }
 
     fn deserialize(&mut self, data: Vec<u8>) -> Result<(), Box<WitError>> {

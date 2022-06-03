@@ -67,7 +67,7 @@ impl Repository {
 
         if parent == path {
             return if required {
-                Err(io_error(format!("No git directory in {:?}", path)))?
+                Err(repo_not_found_error(format!("No git directory in {:?}", path)))?
             } else {
                 Ok(None)
             }
