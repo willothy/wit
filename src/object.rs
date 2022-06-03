@@ -21,7 +21,7 @@ use crate::repository::Repository;
 use crate::tag::Tag;
 use crate::tree::Tree;
 use crate::object::WitObject::*;
-use crate::refs;
+use crate::reference;
 
 pub trait Find<T> {
     fn find(&self, element: T) -> Result<usize, Box<WitError>> { self.find_from(element, 0) }
@@ -196,7 +196,7 @@ pub fn resolve(repo: &Repository, name: &str) -> Result<Option<Vec<String>>, Box
         return Ok(None);
     }
     if name == "HEAD" {
-        return Ok(Some(vec![ refs::resolve(repo, "HEAD")? ]));
+        return Ok(Some(vec![ reference::resolve(repo, "HEAD")? ]));
     }
 
     if hash_re.is_match(name) {

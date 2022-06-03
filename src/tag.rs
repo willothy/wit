@@ -2,7 +2,7 @@ use crate::{
     object::{Object, WitObject::*, self},
     repository::Repository,
     error::WitError,
-    kvlm::{ KVLMExt, KVLM }, refs
+    kvlm::{ KVLMExt, KVLM }, reference
 };
 
 pub struct Tag<'a> {
@@ -58,9 +58,9 @@ pub fn create(repo: &Repository, name: &str, reference: &str, create_object: boo
         // Create the tag object
         let tag_sha = object::write(TagObject(tag), true)?;
         // Create the ref
-        refs::create(&repo, "tags/".to_owned() + name, tag_sha)
+        reference::create(&repo, "tags/".to_owned() + name, tag_sha)
     } else {
         // Create lightweight tag
-        refs::create(&repo, "tags/".to_owned() + name, sha)
+        reference::create(&repo, "tags/".to_owned() + name, sha)
     }
 }

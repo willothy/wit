@@ -4,6 +4,8 @@ use std::num::ParseIntError;
 use std::str::Utf8Error;
 use std::string::FromUtf8Error;
 
+use self::WitErrorType::*;
+
 #[derive(Debug, Clone)]
 pub enum WitErrorType {
     DebugError,
@@ -15,6 +17,8 @@ pub enum WitErrorType {
     UnknownObjectTypeError,
     PathConversionError,
     CLIArgumentError,
+    CLIUnknownCommandError,
+    CLINoCommandError,
     UTF8ConversionError,
     InvalidModeLengthError,
     RepoNotFoundError,
@@ -51,19 +55,19 @@ impl WitError {
 // Conversions for WitError
 impl From<std::io::Error> for WitError {
     fn from(err: std::io::Error) -> Self {
-        WitError::new(WitErrorType::InheritedError, err.to_string())
+        WitError::new(InheritedError, err.to_string())
     }
 }
 
 impl From<regex::Error> for Box<WitError> {
     fn from(err: regex::Error) -> Self {
-        Box::new(WitError::new(WitErrorType::InheritedError, err.to_string()))
+        Box::new(WitError::new(InheritedError, err.to_string()))
     }
 }
 
 impl From<std::io::Error> for Box<WitError> {
     fn from(err: std::io::Error) -> Self {
-        Box::new(WitError::new(WitErrorType::InheritedError, err.to_string()))
+        Box::new(WitError::new(InheritedError, err.to_string()))
     }
 }
 
@@ -75,19 +79,19 @@ impl From<Box<std::io::Error>> for Box<WitError> {
 
 impl From<ParseIntError> for Box<WitError> {
     fn from(err: ParseIntError) -> Self {
-        Box::new(WitError::new(WitErrorType::InheritedError, err.to_string()))
+        Box::new(WitError::new(InheritedError, err.to_string()))
     }
 }
 
 impl From<Utf8Error> for Box<WitError> {
     fn from(err: Utf8Error) -> Self {
-        Box::new(WitError::new(WitErrorType::InheritedError, err.to_string()))
+        Box::new(WitError::new(InheritedError, err.to_string()))
     }
 }
 
 impl From<FromUtf8Error> for Box<WitError> {
     fn from(err: FromUtf8Error) -> Self {
-        Box::new(WitError::new(WitErrorType::UTF8ConversionError, err.to_string()))
+        Box::new(WitError::new(UTF8ConversionError, err.to_string()))
     }
 }
 
@@ -130,6 +134,20 @@ pub mod builder {
         Box::new(WitError::new(
             CLIArgumentError,
             format!("Required argument '{}' was not provided.", arg)
+        ))
+    }
+
+    pub fn cli_unknown_command_err(command: &str) -> Box<WitError> {
+        Box::new(WitError::new(
+            CLIUnknownCommandError,
+            format!("Unknown command '{}'", command)
+        ))
+    }
+
+    pub fn cli_no_command_err() -> Box<WitError> {
+        Box::new(WitError::new(
+            CLINoCommandError,
+            format!("No command provided.")
         ))
     }
 
