@@ -1,12 +1,18 @@
-use std::{env::current_dir, io::{stdout, Write}, fs, str::from_utf8, path::PathBuf};
-use clap::{ArgMatches};
+use std::{
+    env::current_dir,
+    io::{ stdout, Write },
+    fs,
+    str::from_utf8,
+    path::PathBuf
+};
+use clap::ArgMatches;
 use crate::{
-    error::{
-        builder::*,
-        WitError
-    },
+    error::{ builder::*, WitError },
     repository::Repository,
-    object::{self, WitObject}, tree::{Tree}, refs::{self, IndirectRef}
+    object::{ self, WitObject },
+    tree::Tree,
+    refs::{ self, Ref::* },
+    tag
 };
 
 pub fn init(sub_matches: &ArgMatches) -> Result<(), Box<WitError>> {
@@ -31,13 +37,13 @@ pub fn init(sub_matches: &ArgMatches) -> Result<(), Box<WitError>> {
 pub fn cat_file(args: &ArgMatches) -> Result<(), Box<WitError>> {
     let repo: Repository = Repository::find(".", true)?
         .ok_or(io_error(format!("No such repository {}.", args.value_of("object").unwrap_or(""))))?;
-    
+
     let data = object::find(
         &repo,
         args.value_of("object").ok_or(io_error(format!("No object specified")))?,
         Some(args.value_of("file_type").ok_or(io_error(format!("No file type specified")))?),
         true
-    );
+    )?;
     let obj = object::read(
         &repo,
         data.as_str()
@@ -76,7 +82,7 @@ pub fn log(args: &ArgMatches) -> Result<(), Box<WitError>> {
     println!("digraph log {{\n");
     object::graphviz(
         &repo,
-        object::find(&repo, commit, None, true),
+        object::find(&repo, commit, None, true)?,
         &mut Vec::new()
     )?;
     println!("}}");
@@ -86,7 +92,7 @@ pub fn log(args: &ArgMatches) -> Result<(), Box<WitError>> {
 pub fn ls_tree(args: &ArgMatches) -> Result<(), Box<WitError>> {
     let repo = Repository::find(".", true)?.ok_or(debug_error())?;
     let obj_name = args.value_of("object").ok_or(debug_error())?;
-    let obj = match object::read(&repo, &object::find(&repo, obj_name, Some("tree"), true))? {
+    let obj = match object::read(&repo, &object::find(&repo, obj_name, Some("tree"), true)?)? {
         WitObject::TreeObject(tree) => tree,
         _ => Err(malformed_object_error(format!("Object {} is not a tree", obj_name)))?
     };
@@ -114,11 +120,11 @@ pub fn ls_tree(args: &ArgMatches) -> Result<(), Box<WitError>> {
 pub fn checkout(args: &ArgMatches) -> Result<(), Box<WitError>> {
     let repo = Repository::find(".", true)?.ok_or(debug_error())?;
     let obj_name = args.value_of("commit").ok_or(debug_error())?;
-    let obj: Tree = match object::read(&repo, &object::find(&repo, obj_name, Some("tree"), true))? {
+    let obj: Tree = match object::read(&repo, &object::find(&repo, obj_name, Some("tree"), true)?)? {
         WitObject::CommitObject(commit) => {
             match object::read(
                 &repo,
-                &commit.kvlm.get("tree").ok_or(debug_error())?[0]
+                &commit.kvlm().get("tree").ok_or(debug_error())?[0]
             )? {
                 WitObject::TreeObject(tree) => tree,
                 _ => Err(malformed_object_error(format!("Could not find tree from object {}", obj_name)))?
@@ -140,13 +146,32 @@ pub fn checkout(args: &ArgMatches) -> Result<(), Box<WitError>> {
         fs::create_dir_all(args.value_of("path").ok_or(debug_error())?)?;
     }
 
-    crate::object::checkout(&repo, &obj, &path.canonicalize()?)?;
+    object::checkout(&repo, &obj, &path.canonicalize()?)?;
     Ok(())
 }
 
 pub fn show_ref() -> Result<(), Box<WitError>> {
     let repo = Repository::find(".", true)?.ok_or(debug_error())?;
-    let refs: IndirectRef = refs::list(&repo, None)?;
+    let refs = refs::list(&repo, None)?;
     refs::show(&repo, &refs, true, "refs")?;
     Ok(())
+}
+
+pub fn tag(args: &ArgMatches) -> Result<(), Box<WitError>> {
+    let repo = Repository::find(".", true)?.ok_or(debug_error())?;
+    if args.is_present("name") {
+        tag::create(
+            &repo,
+            args.value_of("name").ok_or(debug_error())?,
+            args.value_of("object").ok_or(debug_error())?,
+            args.is_present("create_tag_object")
+        )
+    } else {
+        let refs = refs::list(&repo, None)?;
+        let tags = match refs.get("tags").unwrap() {
+            Indirect(refs) => refs,
+            Direct(s) => Err(debug_error())?
+        };
+        refs::show(&repo, tags, true, "")
+    }
 }

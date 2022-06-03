@@ -8,6 +8,8 @@ mod blob;
 mod commit;
 mod tree;
 mod refs;
+mod tag;
+mod kvlm;
 mod commands;
 mod error;
 mod cli;
@@ -125,7 +127,31 @@ pub fn main() -> ExitCode {
             // show-ref
             Command::new("show-ref")
             .display_order(6)
-            .about("List references")
+            .about("List references"),
+            // tag
+            Command::new("tag")
+            .display_order(7)
+            .about("Create or list a tag")
+            .arg(
+                arg!(-a)
+                .required(false)
+                .requires("name")
+                .id("create_tag_object")
+                .help("Create a tag object")
+                .display_order(0)
+            )
+            .arg(
+                arg!([name])
+                .required(false)
+                .help("Name of the tag")
+                .display_order(1)
+            )
+            .arg(
+                arg!([object])
+                .help("Object the new tag will point to")
+                .display_order(2)
+                .default_value("HEAD")
+            )
         ]);
 
     match app.execute() {

@@ -13,6 +13,7 @@ use crate::blob::Blob;
 use crate::commit::Commit;
 use crate::error::{WitError, builder::*};
 use crate::repository::Repository;
+use crate::tag::Tag;
 use crate::tree::Tree;
 
 pub trait Find<T> {
@@ -79,7 +80,7 @@ pub enum WitObject<'a> {
     BlobObject(Blob<'a>),
     CommitObject(Commit<'a>),
     TreeObject(Tree),
-    //Tag(Tag)
+    TagObject(Tag<'a>)
 }
 
 impl<'a> WitObject<'a> {
@@ -88,7 +89,7 @@ impl<'a> WitObject<'a> {
             WitObject::BlobObject(blob) => blob.serialize(),
             WitObject::CommitObject(commit) => commit.serialize(),
             WitObject::TreeObject(tree) => tree.serialize(),
-            //WitObject::Tag(tag) => tag.serialize()
+            WitObject::TagObject(tag) => tag.serialize()
         }
     }
 
@@ -97,7 +98,7 @@ impl<'a> WitObject<'a> {
             WitObject::BlobObject(blob) => blob.deserialize(data),
             WitObject::CommitObject(commit) => commit.deserialize(data),
             WitObject::TreeObject(tree) => tree.deserialize(data),
-            //WitObject::Tag(tag) => tag.deserialize(data)
+            WitObject::TagObject(tag) => tag.deserialize(data)
         }
     }
 
@@ -106,16 +107,16 @@ impl<'a> WitObject<'a> {
             WitObject::BlobObject(blob) => blob.fmt(),
             WitObject::CommitObject(commit) => commit.fmt(),
             WitObject::TreeObject(tree) => tree.fmt(),
-            //WitObject::Tag(tag) => tag.fmt()
+            WitObject::TagObject(tag) => tag.fmt()
         }
     }
 
     pub fn repo(&self) -> Option<& Repository> {
         match self {
-            WitObject::<'a>::BlobObject(blob) => blob.repo(),
-            WitObject::<'a>::CommitObject(commit) => commit.repo(),
+            WitObject::BlobObject(blob) => blob.repo(),
+            WitObject::CommitObject(commit) => commit.repo(),
             WitObject::TreeObject(tree) => tree.repo(),
-            //WitObject::Tag(tag) => tag.repo()
+            WitObject::TagObject(tag) => tag.repo()
         }
     }
 }
@@ -145,12 +146,11 @@ pub fn read<'a>(repo: &'a Repository, sha: &'a str) -> Result<WitObject<'a>, Box
         Err(malformed_object_error(format!("Malformed object {}: bad length", sha)))?
     }
 
-    build(from_utf8(&fmt)?, Some(repo), raw[y+1..].to_vec())
+    build(from_utf8(&fmt)?, Some(repo), Some(raw[y+1..].to_vec()))
 }
 
-
-pub fn find<'a>(repo: &'a Repository, name: &str, fmt: Option<&str>, follow: bool) -> String {
-    String::from(name)
+pub fn find<'a>(repo: &'a Repository, name: &str, fmt: Option<&str>, follow: bool) -> Result<String, Box<WitError>> {
+    Ok(String::from(name))
 }
 
 pub fn write(obj: WitObject, actually_write: bool) -> Result<String, Box<WitError>> {
@@ -179,18 +179,18 @@ pub fn write(obj: WitObject, actually_write: bool) -> Result<String, Box<WitErro
     Ok(sha)
 }
 
-fn build<'a>(fmt: &str, repo: Option<&'a Repository>, data: Vec<u8>) -> Result<WitObject<'a>, Box<WitError>> {
+fn build<'a>(fmt: &str, repo: Option<&'a Repository>, data: Option<Vec<u8>>) -> Result<WitObject<'a>, Box<WitError>> {
     match fmt {
-        "blob" => Ok(WitObject::BlobObject(Blob::new(repo, data))),
+        "blob" => Ok(WitObject::BlobObject(Blob::new(repo, data.ok_or(debug_error())?))),
         "commit" => Ok(WitObject::CommitObject(Commit::new(repo))),
-        "tree" => Ok(WitObject::TreeObject(Tree::from(&data)?)),
-        //"tag" => Ok(WitObject::Tag(Tag::new(repo, data))),
+        "tree" => Ok(WitObject::TreeObject(Tree::from(&data.ok_or(debug_error())?)?)),
+        "tag" => Ok(WitObject::TagObject(Tag::new(repo))),
         _ => Err(unknown_object_error(format!("Unknown object type {}", fmt)))
     }
 }
 
 pub fn hash<'a>(fd: &str, fmt: &str, repo: Option<&'a Repository>) -> Result<String, Box<WitError>>{
-    write(build(fmt, repo, fs::read(fd)?)?, repo.is_none())
+    write(build(fmt, repo, Some(fs::read(fd)?))?, repo.is_none())
 }
 
 pub fn graphviz(repo: &Repository, sha: String, seen: &mut Vec<String>) -> Result<(), Box<WitError>> {

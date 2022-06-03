@@ -1,4 +1,8 @@
-use crate::{object::Object, repository::Repository, error::WitError};
+use crate::{
+    object::Object, 
+    repository::Repository, 
+    error::WitError
+};
 
 
 pub struct Blob<'a> {

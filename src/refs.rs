@@ -1,8 +1,13 @@
-use std::path::{PathBuf};
-
+use std::path::{PathBuf, Path};
+use std::fs;
 use linked_hash_map::LinkedHashMap;
-
-use crate::{repository::{Repository}, error::{WitError, builder::{utf8_error}}};
+use crate::{
+    repository::Repository,
+    error::{
+        WitError,
+        builder::utf8_error
+    }
+};
 
 pub enum Ref {
     Direct(DirectRef),
@@ -72,5 +77,22 @@ pub fn show(repo: &Repository, refs: &IndirectRef, with_hash: bool, prefix: &str
             }
         }
     }
-    todo!()
+    Ok(())
+}
+
+pub fn create(repo: &Repository, ref_name: String, sha: String) -> Result<(), Box<WitError>> {
+    fs::write(
+        Repository::file(
+            repo,
+            Path::new("refs/")
+                .join(&ref_name)
+                .to_str()
+                .ok_or(utf8_error(format!("Could not read file name.")))?
+                .split('/')
+                .collect::<Vec<&str>>(),
+            true
+        )?,
+        sha + "\n"
+    )?;
+    Ok(())
 }
