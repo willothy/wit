@@ -109,12 +109,12 @@ impl Repository {
                 Err(io_error(format!("{:?} is not a directory.", path)))
             }
         } else if mkdir {
-            match fs::create_dir_all(&path) {
+            return match fs::create_dir_all(&path) {
                 Ok(_) => Ok(path),
                 Err(err) => Err(Box::<WitError>::from(err))
             }
         } else {
-            Err(io_error(format!("Failed to create {:?}", path)))
+            return Err(io_error(format!("Failed to create {:?}", path)))
         }
     }
 

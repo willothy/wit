@@ -1,12 +1,12 @@
 use std::{env::current_dir, io::{stdout, Write}, fs, str::from_utf8, path::PathBuf};
-use clap::{ArgMatches, Arg};
+use clap::{ArgMatches};
 use crate::{
     error::{
         builder::*,
         WitError
     },
     repository::Repository,
-    object::{self, WitObject}, tree::{Tree, self}
+    object::{self, WitObject}, tree::{Tree}, refs::{self, IndirectRef}
 };
 
 pub fn init(sub_matches: &ArgMatches) -> Result<(), Box<WitError>> {
@@ -140,6 +140,13 @@ pub fn checkout(args: &ArgMatches) -> Result<(), Box<WitError>> {
         fs::create_dir_all(args.value_of("path").ok_or(debug_error())?)?;
     }
 
-    object::checkout(&repo, &obj, &path.canonicalize()?)?;
+    crate::object::checkout(&repo, &obj, &path.canonicalize()?)?;
+    Ok(())
+}
+
+pub fn show_ref() -> Result<(), Box<WitError>> {
+    let repo = Repository::find(".", true)?.ok_or(debug_error())?;
+    let refs: IndirectRef = refs::list(&repo, None)?;
+    refs::show(&repo, &refs, true, "refs")?;
     Ok(())
 }

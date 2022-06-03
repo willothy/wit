@@ -7,6 +7,7 @@ mod object;
 mod blob;
 mod commit;
 mod tree;
+mod refs;
 mod commands;
 mod error;
 mod cli;
@@ -121,6 +122,10 @@ pub fn main() -> ExitCode {
                 .display_order(1)
                 .help("The EMPTY directory to checkout on.")
             ),
+            // show-ref
+            Command::new("show-ref")
+            .display_order(6)
+            .about("List references")
         ]);
 
     match app.execute() {

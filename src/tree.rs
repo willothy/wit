@@ -16,22 +16,14 @@ impl Tree {
     pub fn from(raw: &Vec<u8>) -> Result<Self, Box<WitError>> {
         let mut tree = Self::new();
         let mut pos = 0;
-    
+
         while pos < raw.len() {
-            let (end, leaf) = parse_one(raw, pos)?;
+            let (end, leaf) = Self::parse_one(raw, pos)?;
             tree.add_leaf(leaf);
             pos = end;
         }
-    
-        Ok(tree)
-    }
 
-    pub fn new_leaf(&mut self, mode: String, path: PathBuf, sha: String) {
-        self.leaves.push(Leaf {
-            mode,
-            path,
-            sha,
-        });
+        Ok(tree)
     }
 
     pub fn add_leaf(&mut self, leaf: Leaf) {
@@ -40,6 +32,38 @@ impl Tree {
 
     pub fn leaves(&self) -> &Vec<Leaf> {
         &self.leaves
+    }
+
+    pub fn parse_one(raw: &Vec<u8>, start: usize) -> Result<(usize, Leaf), Box<WitError>> {
+        let mode_end = raw.find_from(b'\n', start)?;
+        if mode_end - start != 5 && mode_end - start != 6 {
+            return Err(mode_error(mode_end - start));
+        }
+        let mode = String::from_utf8(raw[start..mode_end].to_vec())?;
+
+        let path_end = raw.find_from(b'\x00', mode_end)?;
+        let path = PathBuf::from(String::from_utf8(raw[mode_end+1..path_end].to_vec())?);
+
+        let sha = Self::sha(&raw[path_end+1..path_end+21].to_vec());
+
+        Ok((path_end + 21, Leaf::new(mode, path, sha)))
+    }
+
+    fn sha(vec: &Vec<u8>) -> String {
+        let mut sha = 0;
+        let mut buf: [u8; 4] = [0, 0, 0, 0];
+        vec.iter().enumerate().for_each(|(i, x)| {
+            if i % 4 == 0 {
+                // https://stackoverflow.com/questions/36669427/does-rust-have-a-way-to-convert-several-bytes-to-a-number
+                sha +=
+                ((buf[0] as u32) << 24) +
+                ((buf[1] as u32) << 16) +
+                ((buf[2] as u32) <<  8) +
+                ((buf[3] as u32) <<  0);
+            }
+            buf[i % 4] = *x;
+        });
+        format!("{:x}", &sha)
     }
 }
 
@@ -65,7 +89,7 @@ impl Object for Tree {
         let mut pos = 0;
 
         while pos < data.len() {
-            let (end, leaf) = parse_one(&data, pos)?;
+            let (end, leaf) = Self::parse_one(&data, pos)?;
             self.add_leaf(leaf);
             pos = end;
         }
@@ -107,53 +131,5 @@ impl Leaf {
     pub fn sha(&self) -> &str {
         &self.sha
     }
-}
-
-pub fn parse_one(raw: &Vec<u8>, start: usize) -> Result<(usize, Leaf), Box<WitError>> {
-    let mode_end = raw.find_from(b'\n', start)?;
-
-    if mode_end - start != 5 && mode_end - start != 6 {
-        return Err(mode_error(mode_end - start));
-    }
-    let mode = String::from_utf8(raw[start..mode_end].to_vec())?;
-
-    let path_end = raw.find_from(b'\x00', mode_end)?;
-    let path = PathBuf::from(String::from_utf8(raw[mode_end+1..path_end].to_vec())?);
-
-    let sha = sha(&raw[path_end+1..path_end+21].to_vec());
-
-    Ok((path_end + 21, Leaf::new(mode, path, sha)))
-}
-
-pub fn tree_parse(raw: &Vec<u8>) -> Result<Tree, Box<WitError>> {
-    let mut tree = Tree::new();
-    let mut pos = 0;
-
-    while pos < raw.len() {
-        let (end, leaf) = parse_one(raw, pos)?;
-        tree.add_leaf(leaf);
-        pos = end;
-    }
-
-    Ok(tree)
-}
-
-
-
-fn sha(vec: &Vec<u8>) -> String {
-    let mut sha = 0;
-    let mut buf: [u8; 4] = [0, 0, 0, 0];
-    vec.iter().enumerate().for_each(|(i, x)| {
-        if i % 4 == 0 {
-            // https://stackoverflow.com/questions/36669427/does-rust-have-a-way-to-convert-several-bytes-to-a-number
-            sha +=
-            ((buf[0] as u32) << 24) +
-            ((buf[1] as u32) << 16) +
-            ((buf[2] as u32) <<  8) +
-            ((buf[3] as u32) <<  0);
-        }
-        buf[i % 4] = *x;
-    });
-    format!("{:x}", &sha)
 }
 

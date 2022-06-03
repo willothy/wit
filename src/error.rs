@@ -17,6 +17,7 @@ pub enum WitErrorType {
     CLIArgumentError,
     UTF8ConversionError,
     InvalidModeLengthError,
+    RepoNotFoundError
 }
 
 impl Display for WitErrorType {

@@ -15,6 +15,8 @@ impl<'a> CliExecute<'a> for Command<'a> {
             Some(("hash-object", args)) => commands::hash_object(args),
             Some(("log", args)) => commands::log(args),
             Some(("ls-tree", args)) => commands::ls_tree(args),
+            Some(("checkout", args)) => commands::checkout(args),
+            Some(("show-ref", _)) => commands::show_ref(),
             Some((invalid_cmd, _)) => {
                 Err(io_error(format!("Unknown command {}", invalid_cmd)))
             }
