@@ -1,3 +1,4 @@
+use std::array::TryFromSliceError;
 use std::fmt::Display;
 use std::error::Error;
 use std::num::ParseIntError;
@@ -61,6 +62,12 @@ impl From<std::io::Error> for WitError {
 
 impl From<regex::Error> for Box<WitError> {
     fn from(err: regex::Error) -> Self {
+        Box::new(WitError::new(InheritedError, err.to_string()))
+    }
+}
+
+impl From<TryFromSliceError> for Box<WitError> {
+    fn from(err: TryFromSliceError) -> Self {
         Box::new(WitError::new(InheritedError, err.to_string()))
     }
 }

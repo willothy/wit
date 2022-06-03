@@ -8,8 +8,10 @@ mod commit;
 mod tree;
 mod reference;
 mod tag;
+mod index;
 mod kvlm;
 mod error;
+mod util;
 mod cli;
 
 pub fn main() -> ExitCode {
