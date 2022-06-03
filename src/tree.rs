@@ -37,7 +37,7 @@ impl Tree {
     pub fn parse_one(raw: &Vec<u8>, start: usize) -> Result<(usize, Leaf), Box<WitError>> {
         let mode_end = raw.find_from(b'\n', start)?;
         if mode_end - start != 5 && mode_end - start != 6 {
-            return Err(mode_error(mode_end - start));
+            return Err(mode_err(mode_end - start));
         }
         let mode = String::from_utf8(raw[start..mode_end].to_vec())?;
 
@@ -76,7 +76,7 @@ impl Object for Tree {
             bytes.extend(leaf.mode().as_bytes());
             bytes.push(b' ');
             bytes.extend(leaf.path().to_str().ok_or(
-                utf8_error(format!("Could not convert {} to str.", leaf.path().to_str().unwrap_or("")))
+                utf8_err(format!("Could not convert {} to str.", leaf.path().to_str().unwrap_or("")))
             )?.as_bytes());
             bytes.push(b'\x00');
             bytes.extend(

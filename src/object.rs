@@ -3,20 +3,24 @@ use std::fs;
 use std::path::PathBuf;
 use std::str::from_utf8;
 
-use crypto::digest::Digest;
-use flate2::Compression;
-use flate2::write::{ZlibEncoder};
-use flate2::read::ZlibDecoder;
-use crypto;
+use flate2::{
+    Compression,
+    read::ZlibDecoder,
+    write::ZlibEncoder
+};
+use crypto::{
+    sha1::Sha1,
+    digest::Digest
+};
 use regex::Regex;
 
 use crate::blob::Blob;
 use crate::commit::Commit;
 use crate::error::{WitError, builder::*};
 use crate::repository::Repository;
-use crate::tag::{Tag};
+use crate::tag::Tag;
 use crate::tree::Tree;
-use crate::object::{WitObject::*};
+use crate::object::WitObject::*;
 use crate::refs;
 
 pub trait Find<T> {
@@ -59,7 +63,7 @@ impl Replace for Vec<u8> {
 impl<T: PartialEq + std::fmt::Debug> Find<T> for Vec<T> {
     fn find_from(&self, element: T, start: usize) -> Result<usize, Box<WitError>> {
         self.iter().skip(start).position(|el| *el == element).ok_or(
-            io_error(format!("{:?} not found.", element))
+            io_err(format!("{:?} not found.", element))
         )
     }
 
@@ -137,7 +141,7 @@ pub fn read<'a>(repo: &'a Repository, sha: &'a str) -> Result<WitObject<'a>, Box
 
     let size = from_utf8(&decoded[x..y])?.parse::<usize>()?;
     if size != decoded.len() - y - 1 {
-        Err(malformed_object_error(format!("Malformed object {}: bad length", sha)))?
+        Err(malformed_object_err(format!("Malformed object {}: bad length", sha)))?
     }
 
     build(from_utf8(&fmt)?, Some(repo), Some(raw[y+1..].to_vec()))
@@ -145,14 +149,14 @@ pub fn read<'a>(repo: &'a Repository, sha: &'a str) -> Result<WitObject<'a>, Box
 
 pub fn find<'a>(repo: &'a Repository, name: &str, fmt: Option<&str>, follow: bool) -> Result<String, Box<WitError>> {
     let sha = self::resolve(repo, name)?.ok_or(
-        unknown_reference_error(format!("Unknown reference {}.", name))
+        unknown_reference_err(format!("Unknown reference {}.", name))
     )?;
     if sha.len() > 1 {
         let mut candidates = String::new();
         sha.iter().for_each(|s| {
             candidates.push_str(&("\n- ".to_owned() + s));
         });
-        Err(ambiguous_reference_error(format!("Ambiguous reference {}: Candidates are:{}\n", name, candidates)))?
+        Err(ambiguous_reference_err(format!("Ambiguous reference {}: Candidates are:{}\n", name, candidates)))?
     }
     let mut sha = sha.get(0).unwrap().to_string();
 
@@ -168,7 +172,7 @@ pub fn find<'a>(repo: &'a Repository, name: &str, fmt: Option<&str>, follow: boo
             return Ok(sha.to_string());
         }
         if !follow {
-            return Err(unknown_object_error(format!("Unknown object {}.", sha)))?;
+            return Err(unknown_object_err(format!("Unknown object {}.", sha)))?;
         }
 
 
@@ -180,14 +184,14 @@ pub fn find<'a>(repo: &'a Repository, name: &str, fmt: Option<&str>, follow: boo
             }
         }
 
-        return Err(unknown_object_error(format!("Unknown object {}.", sha)))?;
+        return Err(unknown_object_err(format!("Unknown object {}.", sha)))?;
     }
 }
 
 pub fn resolve(repo: &Repository, name: &str) -> Result<Option<Vec<String>>, Box<WitError>> {
     let mut candidates: Vec<String> = Vec::new();
-    let hash_re = Regex::new("^[0-9a-f]{4,40}$")?;
-    
+    let hash_re = Regex::new("^[0-9a-fA-F]{4,40}$")?;
+
     if name.trim().len() == 0 {
         return Ok(None);
     }
@@ -211,7 +215,7 @@ pub fn resolve(repo: &Repository, name: &str) -> Result<Option<Vec<String>>, Box
                     utf8_error(format!("Cannot convert filename to string"))
                 )?;*/
                 let f = f.to_str().ok_or(
-                    utf8_error(format!("Cannot convert filename to string"))
+                    utf8_err(format!("Cannot convert filename to string"))
                 )?;
                 if f.starts_with(rem) {
                     candidates.push(prefix.to_owned() + f)
@@ -232,7 +236,7 @@ pub fn write(obj: WitObject, actually_write: bool) -> Result<String, Box<WitErro
     result.extend(vec![b'\x00']);
     result.extend(data);
 
-    let mut sha = crypto::sha1::Sha1::new();
+    let mut sha = Sha1::new();
     sha.input(&result);
     let sha = sha.result_str();
 
@@ -241,7 +245,11 @@ pub fn write(obj: WitObject, actually_write: bool) -> Result<String, Box<WitErro
         encoder.write_all(&result)?;
 
         fs::write(
-            Repository::file(obj.repo().ok_or(debug_error())?, vec!["objects"], actually_write)?, // Path
+            Repository::file(
+                obj.repo().ok_or(repo_not_found_err(format!("No repo found for object")))?, 
+                vec!["objects"],
+                actually_write
+            )?, // Path
             encoder.finish()? // Data
         )?;
     }
@@ -251,11 +259,11 @@ pub fn write(obj: WitObject, actually_write: bool) -> Result<String, Box<WitErro
 
 fn build<'a>(fmt: &str, repo: Option<&'a Repository>, data: Option<Vec<u8>>) -> Result<WitObject<'a>, Box<WitError>> {
     match fmt {
-        "blob" => Ok(WitObject::BlobObject(Blob::new(repo, data.ok_or(debug_error())?))),
+        "blob" => Ok(WitObject::BlobObject(Blob::new(repo, data.ok_or(missing_data_err("Data is required to construct a blob.".to_owned()))?))),
         "commit" => Ok(WitObject::CommitObject(Commit::new(repo))),
-        "tree" => Ok(WitObject::TreeObject(Tree::from(&data.ok_or(debug_error())?)?)),
+        "tree" => Ok(WitObject::TreeObject(Tree::from(&data.ok_or(missing_data_err("Data is required to construct a tree.".to_owned()))?)?)),
         "tag" => Ok(WitObject::TagObject(Tag::new(repo))),
-        _ => Err(unknown_object_error(format!("Unknown object type {}", fmt)))
+        _ => Err(unknown_object_err(format!("Unknown object type {}", fmt)))
     }
 }
 
@@ -273,17 +281,19 @@ pub fn graphviz(repo: &Repository, sha: String, seen: &mut Vec<String>) -> Resul
         WitObject::CommitObject(commit) => {
             match commit.fmt().as_slice() {
                 b"commit" => commit,
-                _ => return Err(malformed_object_error(format!("Malformed commit {}", sha)))
+                _ => return Err(malformed_object_err(format!("Malformed commit {}", sha)))
             }
         },
-        _ => Err(debug_error())?
+        obj => Err(unknown_object_err(
+            format!("Cannot log a non-commit object; found {}", String::from_utf8(obj.fmt()).unwrap_or("<invalid>".to_owned()))
+        ))?
     };
 
     if !commit.kvlm().contains_key("parent") {
         return Ok(())
     }
 
-    let parents = commit.kvlm().get("parent").ok_or(malformed_object_error("No parent".to_owned()))?;
+    let parents = commit.kvlm().get("parent").ok_or(malformed_object_err("No parent".to_owned()))?;
     for parent in parents {
         println!("c_{} -> c_{}", sha, parent);
         graphviz(repo, parent.clone(), seen)?;
@@ -306,7 +316,13 @@ pub fn checkout<'a>(repo: &'a Repository, tree: &Tree, path: &PathBuf) -> Result
                 fs::create_dir_all(&dest)?;
                 checkout(repo, &tree, &dest)?;
             },
-            _ => return Err(debug_error())?
+            _ => return Err(unknown_object_err(
+                format!(
+                    "Object {} of type {} cannot be checked out.",
+                    path.to_str().unwrap(),
+                    String::from_utf8(obj.fmt()).unwrap_or("unknown".to_owned())
+                )
+            ))?
         }
     }
     Ok(())

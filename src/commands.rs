@@ -18,13 +18,13 @@ use crate::{
 pub fn init(sub_matches: &ArgMatches) -> Result<(), Box<WitError>> {
     let pwd = match current_dir() {
         Ok(dir) => dir,
-        Err(_) => Err(io_error(String::from("Could not find pwd")))?
+        Err(_) => Err(io_err(String::from("Could not find pwd")))?
     };
     let pwd = match pwd.to_str() {
         Some(string) => {
             String::from(string)
         },
-        None => Err(io_error(String::from("Could not read pwd")))?
+        None => Err(io_err(String::from("Could not read pwd")))?
     };
 
     if let Err(e) = Repository::create(sub_matches.value_of("path").unwrap_or(pwd.as_str())) {
@@ -35,13 +35,12 @@ pub fn init(sub_matches: &ArgMatches) -> Result<(), Box<WitError>> {
 }
 
 pub fn cat_file(args: &ArgMatches) -> Result<(), Box<WitError>> {
-    let repo: Repository = Repository::find(".", true)?
-        .ok_or(io_error(format!("No such repository {}.", args.value_of("object").unwrap_or(""))))?;
+    let repo: Repository = Repository::find(".", true)?.ok_or(pwd_not_repo_err())?;
 
     let data = object::find(
         &repo,
-        args.value_of("object").ok_or(io_error(format!("No object specified")))?,
-        Some(args.value_of("file_type").ok_or(io_error(format!("No file type specified")))?),
+        args.value_of("object").ok_or(io_err(format!("No object specified")))?,
+        Some(args.value_of("file_type").ok_or(io_err(format!("No file type specified")))?),
         true
     )?;
     let obj = object::read(
@@ -66,10 +65,14 @@ pub fn hash_object(args: &ArgMatches) -> Result<(), Box<WitError>> {
     let sha = object::hash(
         from_utf8(
             &fs::read(
-                args.value_of("file").ok_or(debug_error())?
+                args.value_of("file").ok_or(
+                    cli_argument_err("file")
+                )?
             )?[..]
         )?,
-        args.value_of("type").ok_or(debug_error())?,
+        args.value_of("type").ok_or(
+            cli_argument_err("type")
+        )?,
         repo
     );
     println!("{sha:?}");
@@ -77,8 +80,8 @@ pub fn hash_object(args: &ArgMatches) -> Result<(), Box<WitError>> {
 }
 
 pub fn log(args: &ArgMatches) -> Result<(), Box<WitError>> {
-    let commit = args.value_of("commit").ok_or(cli_argument_error("No commit specified".to_owned()))?;
-    let repo = Repository::find(".", true)?.unwrap();
+    let commit = args.value_of("commit").ok_or(cli_argument_err("commit"))?;
+    let repo = Repository::find(".", true)?.ok_or(pwd_not_repo_err())?;
     println!("digraph log {{\n");
     object::graphviz(
         &repo,
@@ -90,11 +93,13 @@ pub fn log(args: &ArgMatches) -> Result<(), Box<WitError>> {
 }
 
 pub fn ls_tree(args: &ArgMatches) -> Result<(), Box<WitError>> {
-    let repo = Repository::find(".", true)?.ok_or(debug_error())?;
-    let obj_name = args.value_of("object").ok_or(debug_error())?;
+    let repo = Repository::find(".", true)?.ok_or(pwd_not_repo_err())?;
+    let obj_name = args.value_of("object").ok_or(
+        cli_argument_err("object")
+    )?;
     let obj = match object::read(&repo, &object::find(&repo, obj_name, Some("tree"), true)?)? {
         WitObject::TreeObject(tree) => tree,
-        _ => Err(malformed_object_error(format!("Object {} is not a tree", obj_name)))?
+        _ => Err(malformed_object_err(format!("Object {} is not a tree", obj_name)))?
     };
 
     let mut mode_str = String::new();
@@ -118,32 +123,36 @@ pub fn ls_tree(args: &ArgMatches) -> Result<(), Box<WitError>> {
 
 
 pub fn checkout(args: &ArgMatches) -> Result<(), Box<WitError>> {
-    let repo = Repository::find(".", true)?.ok_or(debug_error())?;
-    let obj_name = args.value_of("commit").ok_or(debug_error())?;
+    let repo = Repository::find(".", true)?.ok_or(pwd_not_repo_err())?;
+    let obj_name = args.value_of("commit").ok_or(cli_argument_err("commit"))?;
     let obj: Tree = match object::read(&repo, &object::find(&repo, obj_name, Some("tree"), true)?)? {
         WitObject::CommitObject(commit) => {
             match object::read(
                 &repo,
-                &commit.kvlm().get("tree").ok_or(debug_error())?[0]
+                &commit.kvlm().get("tree").ok_or(
+                    missing_data_err(format!("No tree in commit {}", obj_name))
+                )?[0]
             )? {
                 WitObject::TreeObject(tree) => tree,
-                _ => Err(malformed_object_error(format!("Could not find tree from object {}", obj_name)))?
+                _ => Err(malformed_object_err(format!("Could not find tree from object {}", obj_name)))?
             }
         },
         WitObject::TreeObject(tree) => tree,
-        other => Err(malformed_object_error(format!("Expected a commit or tree object, got {}", from_utf8(&other.fmt()).unwrap_or("?"))))?
+        other => Err(malformed_object_err(format!("Expected a commit or tree object, got {}", from_utf8(&other.fmt()).unwrap_or("?"))))?
     };
 
-    let path = PathBuf::from(args.value_of("path").ok_or(debug_error())?);
+    let path = PathBuf::from(args.value_of("path").ok_or(
+        cli_argument_err("path")
+    )?);
     if path.exists() {
         if !path.is_dir() {
-            Err(debug_error())?
+            Err(not_a_directory_err(&path))?
         }
         if !path.read_dir()?.next().is_none() {
-            Err(debug_error())?
+            Err(dir_not_empty_err(&path))?
         }
     } else {
-        fs::create_dir_all(args.value_of("path").ok_or(debug_error())?)?;
+        fs::create_dir_all(&path)?;
     }
 
     object::checkout(&repo, &obj, &path.canonicalize()?)?;
@@ -151,26 +160,34 @@ pub fn checkout(args: &ArgMatches) -> Result<(), Box<WitError>> {
 }
 
 pub fn show_ref() -> Result<(), Box<WitError>> {
-    let repo = Repository::find(".", true)?.ok_or(debug_error())?;
+    let repo = Repository::find(".", true)?.ok_or(pwd_not_repo_err())?;
     let refs = refs::list(&repo, None)?;
     refs::show(&repo, &refs, true, "refs")?;
     Ok(())
 }
 
 pub fn tag(args: &ArgMatches) -> Result<(), Box<WitError>> {
-    let repo = Repository::find(".", true)?.ok_or(debug_error())?;
+    let repo = Repository::find(".", true)?.ok_or(pwd_not_repo_err())?;
     if args.is_present("name") {
         tag::create(
             &repo,
-            args.value_of("name").ok_or(debug_error())?,
-            args.value_of("object").ok_or(debug_error())?,
+            args.value_of("name").ok_or(
+                cli_argument_err("name")
+            )?,
+            args.value_of("object").ok_or(
+                cli_argument_err("object")
+            )?,
             args.is_present("create_tag_object")
         )
     } else {
         let refs = refs::list(&repo, None)?;
         let tags = match refs.get("tags").unwrap() {
             Indirect(refs) => refs,
-            Direct(_) => Err(debug_error())?
+            Direct(direct) => Err(
+                unknown_reference_err(
+                    format!("Expected an indirect reference, got direct reference {}", direct)
+                )
+            )?
         };
         refs::show(&repo, tags, true, "")
     }

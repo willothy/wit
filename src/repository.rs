@@ -18,26 +18,26 @@ impl Repository {
         let config_path = git_dir.join("config");
 
         if !(force || git_dir.is_dir()) {
-            Err(repo_creation_error(format!("{} is not a git repository", path)))?
+            Err(repo_creation_err(format!("{} is not a git repository", path)))?
         }
 
         if config_path.exists() && config_path.is_file() {
             config.load(match config_path.to_str() {
                 Some(string) => string,
-                None => Err(repo_creation_error(format!("Could not load config from {:?}", config_path)))?
+                None => Err(repo_creation_err(format!("Could not load config from {:?}", config_path)))?
             }).unwrap();
         } else if !force {
-            Err(repo_creation_error(format!("Could not create repository in {}", path)))?
+            Err(repo_creation_err(format!("Could not create repository in {}", path)))?
         }
 
         if !force {
             let version = config
                 .get("core", "repositoryformatversion")
                 .ok_or(
-                    version_mismatch_error(format!("Could not read repository format version from config."))
+                    version_mismatch_err(format!("Could not read repository format version from config."))
                 )?.parse::<i32>()?;
             if version != 0 {
-                Err(version_mismatch_error(format!("Unsupported repositoryformatversion {}", version)))?
+                Err(version_mismatch_err(format!("Unsupported repositoryformatversion {}", version)))?
             }
         }
         Ok(Repository {
@@ -56,7 +56,7 @@ impl Repository {
                     Repository::new(
                         path
                             .to_str()
-                            .ok_or(path_conversion_error())?,
+                            .ok_or(path_conversion_err())?,
                         false
                     )?
                 )
@@ -67,14 +67,14 @@ impl Repository {
 
         if parent == path {
             return if required {
-                Err(repo_not_found_error(format!("No git directory in {:?}", path)))?
+                Err(repo_not_found_err(format!("No git directory in {:?}", path)))?
             } else {
                 Ok(None)
             }
         }
 
         Self::find(
-            parent.to_str().ok_or(path_conversion_error())?,
+            parent.to_str().ok_or(path_conversion_err())?,
             required
         )
     }
@@ -106,7 +106,7 @@ impl Repository {
             if path.is_dir() {
                 Ok(path)
             } else  {
-                Err(io_error(format!("{:?} is not a directory.", path)))
+                Err(io_err(format!("{:?} is not a directory.", path)))
             }
         } else if mkdir {
             return match fs::create_dir_all(&path) {
@@ -114,7 +114,7 @@ impl Repository {
                 Err(err) => Err(Box::<WitError>::from(err))
             }
         } else {
-            return Err(io_error(format!("Failed to create {:?}", path)))
+            return Err(io_err(format!("Failed to create {:?}", path)))
         }
     }
 
@@ -123,10 +123,10 @@ impl Repository {
 
         if repo.worktree.exists() {
             if !repo.worktree.is_dir() {
-                Err(repo_creation_error(format!("{} is not a directory.", path)))?
+                Err(repo_creation_err(format!("{} is not a directory.", path)))?
             }
             if !repo.worktree.read_dir().map(|mut i| i.next().is_none()).unwrap_or(false) {
-                Err(repo_creation_error(format!("Directory {} is not empty.", path)))?
+                Err(repo_creation_err(format!("Directory {} is not empty.", path)))?
             }
         } else {
             if let Err(e) = fs::create_dir_all(&repo.worktree) {
@@ -153,7 +153,7 @@ impl Repository {
         if let Err(err) = Self::default_config().write(
             Self::file(&repo, vec!["config"], true)?
                 .to_str()
-                .ok_or(repo_creation_error(format!("Error opening config file.")))?
+                .ok_or(repo_creation_err(format!("Error opening config file.")))?
         ) {
             Err(Box::<WitError>::from(err))?
         }

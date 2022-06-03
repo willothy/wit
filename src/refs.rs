@@ -5,7 +5,7 @@ use crate::{
     repository::Repository,
     error::{
         WitError,
-        builder::utf8_error
+        builder::utf8_err
     }
 };
 
@@ -42,7 +42,7 @@ pub fn list(repo: &Repository, path: Option<PathBuf>) -> Result<IndirectRef, Box
         let name = String::from(
             can
             .file_name()
-            .to_str().ok_or(utf8_error(format!("Could not read file name.")))?
+            .to_str().ok_or(utf8_err(format!("Could not read file name.")))?
         );
         if can.path().is_dir() {
             ret.insert(
@@ -87,7 +87,7 @@ pub fn create(repo: &Repository, ref_name: String, sha: String) -> Result<(), Bo
             Path::new("refs/")
                 .join(&ref_name)
                 .to_str()
-                .ok_or(utf8_error(format!("Could not read file name.")))?
+                .ok_or(utf8_err(format!("Could not read file name.")))?
                 .split('/')
                 .collect::<Vec<&str>>(),
             true

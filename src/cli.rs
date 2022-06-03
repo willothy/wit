@@ -1,6 +1,6 @@
 
 use clap::Command;
-use crate::error::{builder::io_error, WitError};
+use crate::error::{builder::io_err, WitError};
 use crate::commands;
 
 pub trait CliExecute<'a> {
@@ -19,10 +19,10 @@ impl<'a> CliExecute<'a> for Command<'a> {
             Some(("show-ref", _)) => commands::show_ref(),
             Some(("tag", args)) => commands::tag(args),
             Some((invalid_cmd, _)) => {
-                Err(io_error(format!("Unknown command {}", invalid_cmd)))
+                Err(io_err(format!("Unknown command {}", invalid_cmd)))
             }
             None => {
-                Err(io_error(format!("No command specified")))
+                Err(io_err(format!("No command specified")))
             }
         }
     }

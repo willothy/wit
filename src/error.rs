@@ -20,6 +20,9 @@ pub enum WitErrorType {
     RepoNotFoundError,
     AmbiguousReferenceError,
     UnknownReferenceError,
+    MissingDataError,
+    NotADirectoryError,
+    DirectoryNotEmptyError,
 }
 
 impl Display for WitErrorType {
@@ -99,55 +102,77 @@ pub mod builder {
 
     // For debug use only
     #[allow(dead_code)]
-    pub fn debug_error() -> Box<WitError> {
+    pub fn debug_err() -> Box<WitError> {
         Box::new(WitError::new(DebugError, String::from("Generic debug error.")))
     }
 
-    pub fn io_error(message: String) -> Box<WitError> {
+    pub fn io_err(message: String) -> Box<WitError> {
         Box::new(WitError::new(IOError, message))
     }
 
-    pub fn repo_creation_error(message: String) -> Box<WitError> {
+    pub fn repo_creation_err(message: String) -> Box<WitError> {
         Box::new(WitError::new(RepoCreationError, message))
     }
 
-    pub fn version_mismatch_error(message: String) -> Box<WitError> {
+    pub fn version_mismatch_err(message: String) -> Box<WitError> {
         Box::new(WitError::new(VersionMismatchError, message))
     }
 
-    pub fn malformed_object_error(message: String) -> Box<WitError> {
+    pub fn malformed_object_err(message: String) -> Box<WitError> {
         Box::new(WitError::new(MalformedObjectError, message))
     }
 
-    pub fn path_conversion_error() -> Box<WitError> {
+    pub fn path_conversion_err() -> Box<WitError> {
         Box::new(WitError::new(MalformedObjectError, format!("Could not convert path to string")))
     }
 
-    pub fn cli_argument_error(message: String) -> Box<WitError> {
-        Box::new(WitError::new(CLIArgumentError, message))
+    pub fn cli_argument_err(arg: &str) -> Box<WitError> {
+        Box::new(WitError::new(
+            CLIArgumentError,
+            format!("Required argument '{}' was not provided.", arg)
+        ))
     }
 
-    pub fn unknown_object_error(message: String) -> Box<WitError> {
+    pub fn unknown_object_err(message: String) -> Box<WitError> {
         Box::new(WitError::new(UnknownObjectTypeError, message))
     }
 
-    pub fn utf8_error(message: String) -> Box<WitError> {
+    pub fn utf8_err(message: String) -> Box<WitError> {
         Box::new(WitError::new(UTF8ConversionError, message))
     }
 
-    pub fn mode_error(length: usize) -> Box<WitError> {
+    pub fn mode_err(length: usize) -> Box<WitError> {
         Box::new(WitError::new(InvalidModeLengthError, format!("Invalid mode length: {}", length)))
     }
 
-    pub fn repo_not_found_error(message: String) -> Box<WitError> {
+    pub fn repo_not_found_err(message: String) -> Box<WitError> {
         Box::new(WitError::new(RepoNotFoundError, message))
     }
 
-    pub fn ambiguous_reference_error(message: String) -> Box<WitError> {
+    pub fn pwd_not_repo_err() -> Box<WitError> {
+        Box::new(WitError::new(
+            RepoNotFoundError,
+            format!("No repository found in {}", std::env::current_dir().unwrap().display())
+        ))
+    }
+
+    pub fn ambiguous_reference_err(message: String) -> Box<WitError> {
         Box::new(WitError::new(AmbiguousReferenceError, message))
     }
 
-    pub fn unknown_reference_error(message: String) -> Box<WitError> {
+    pub fn unknown_reference_err(message: String) -> Box<WitError> {
         Box::new(WitError::new(UnknownReferenceError, message))
+    }
+
+    pub fn missing_data_err(message: String) -> Box<WitError> {
+        Box::new(WitError::new(MissingDataError, message))
+    }
+
+    pub fn not_a_directory_err(path: &std::path::PathBuf) -> Box<WitError> {
+        Box::new(WitError::new(NotADirectoryError, path.display().to_string()))
+    }
+
+    pub fn dir_not_empty_err(path: &std::path::PathBuf) -> Box<WitError> {
+        Box::new(WitError::new(DirectoryNotEmptyError, path.display().to_string()))
     }
 }
