@@ -17,7 +17,9 @@ pub enum WitErrorType {
     CLIArgumentError,
     UTF8ConversionError,
     InvalidModeLengthError,
-    RepoNotFoundError
+    RepoNotFoundError,
+    AmbiguousReferenceError,
+    UnknownReferenceError,
 }
 
 impl Display for WitErrorType {
@@ -47,6 +49,12 @@ impl WitError {
 impl From<std::io::Error> for WitError {
     fn from(err: std::io::Error) -> Self {
         WitError::new(WitErrorType::InheritedError, err.to_string())
+    }
+}
+
+impl From<regex::Error> for Box<WitError> {
+    fn from(err: regex::Error) -> Self {
+        Box::new(WitError::new(WitErrorType::InheritedError, err.to_string()))
     }
 }
 
@@ -129,5 +137,17 @@ pub mod builder {
 
     pub fn mode_error(length: usize) -> Box<WitError> {
         Box::new(WitError::new(InvalidModeLengthError, format!("Invalid mode length: {}", length)))
+    }
+
+    pub fn repo_not_found_error(message: String) -> Box<WitError> {
+        Box::new(WitError::new(RepoNotFoundError, message))
+    }
+
+    pub fn ambiguous_reference_error(message: String) -> Box<WitError> {
+        Box::new(WitError::new(AmbiguousReferenceError, message))
+    }
+
+    pub fn unknown_reference_error(message: String) -> Box<WitError> {
+        Box::new(WitError::new(UnknownReferenceError, message))
     }
 }

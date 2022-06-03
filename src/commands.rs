@@ -170,7 +170,7 @@ pub fn tag(args: &ArgMatches) -> Result<(), Box<WitError>> {
         let refs = refs::list(&repo, None)?;
         let tags = match refs.get("tags").unwrap() {
             Indirect(refs) => refs,
-            Direct(s) => Err(debug_error())?
+            Direct(_) => Err(debug_error())?
         };
         refs::show(&repo, tags, true, "")
     }

@@ -8,13 +8,16 @@ use flate2::Compression;
 use flate2::write::{ZlibEncoder};
 use flate2::read::ZlibDecoder;
 use crypto;
+use regex::Regex;
 
 use crate::blob::Blob;
 use crate::commit::Commit;
 use crate::error::{WitError, builder::*};
 use crate::repository::Repository;
-use crate::tag::Tag;
+use crate::tag::{Tag};
 use crate::tree::Tree;
+use crate::object::{WitObject::*};
+use crate::refs;
 
 pub trait Find<T> {
     fn find(&self, element: T) -> Result<usize, Box<WitError>> { self.find_from(element, 0) }
@@ -93,15 +96,6 @@ impl<'a> WitObject<'a> {
         }
     }
 
-    pub fn deserialize(&mut self, data: Vec<u8>) -> Result<(), Box<WitError>> {
-        match self {
-            WitObject::BlobObject(blob) => blob.deserialize(data),
-            WitObject::CommitObject(commit) => commit.deserialize(data),
-            WitObject::TreeObject(tree) => tree.deserialize(data),
-            WitObject::TagObject(tag) => tag.deserialize(data)
-        }
-    }
-
     pub fn fmt(&self) -> Vec<u8> {
         match self {
             WitObject::BlobObject(blob) => blob.fmt(),
@@ -150,7 +144,83 @@ pub fn read<'a>(repo: &'a Repository, sha: &'a str) -> Result<WitObject<'a>, Box
 }
 
 pub fn find<'a>(repo: &'a Repository, name: &str, fmt: Option<&str>, follow: bool) -> Result<String, Box<WitError>> {
-    Ok(String::from(name))
+    let sha = self::resolve(repo, name)?.ok_or(
+        unknown_reference_error(format!("Unknown reference {}.", name))
+    )?;
+    if sha.len() > 1 {
+        let mut candidates = String::new();
+        sha.iter().for_each(|s| {
+            candidates.push_str(&("\n- ".to_owned() + s));
+        });
+        Err(ambiguous_reference_error(format!("Ambiguous reference {}: Candidates are:{}\n", name, candidates)))?
+    }
+    let mut sha = sha.get(0).unwrap().to_string();
+
+    if fmt.is_none() {
+        return Ok(sha.to_string());
+    }
+
+    loop {
+        let obj = self::read(repo, &sha)?;
+        let obj_fmt = obj.fmt();
+        let fmt = fmt.unwrap().as_bytes();
+        if obj_fmt == fmt {
+            return Ok(sha.to_string());
+        }
+        if !follow {
+            return Err(unknown_object_error(format!("Unknown object {}.", sha)))?;
+        }
+
+
+        if let TagObject(mut tag) = obj {
+            sha = tag.kvlm().get("object").unwrap().get(0).unwrap().to_string();
+        } else if let CommitObject(commit) = obj {
+            if fmt == b"tree" {
+                sha = commit.kvlm().get("tree").unwrap().get(0).unwrap().to_string();
+            }
+        }
+
+        return Err(unknown_object_error(format!("Unknown object {}.", sha)))?;
+    }
+}
+
+pub fn resolve(repo: &Repository, name: &str) -> Result<Option<Vec<String>>, Box<WitError>> {
+    let mut candidates: Vec<String> = Vec::new();
+    let hash_re = Regex::new("^[0-9a-f]{4,40}$")?;
+    
+    if name.trim().len() == 0 {
+        return Ok(None);
+    }
+    if name == "HEAD" {
+        return Ok(Some(vec![ refs::resolve(repo, "HEAD")? ]));
+    }
+
+    if hash_re.is_match(name) {
+        let name = name.to_lowercase();
+        if name.len() == 40 {
+            return Ok(Some(vec![ name ]));
+        }
+
+        let prefix = &name[0..2];
+        let path = Repository::dir(repo, vec!["objects", prefix], false);
+        if path.is_ok() {
+            let rem = &name[2..];
+            for file in fs::read_dir(path?)? {
+                let file = file?;
+                let f = &file.file_name();/* .to_str().ok_or(
+                    utf8_error(format!("Cannot convert filename to string"))
+                )?;*/
+                let f = f.to_str().ok_or(
+                    utf8_error(format!("Cannot convert filename to string"))
+                )?;
+                if f.starts_with(rem) {
+                    candidates.push(prefix.to_owned() + f)
+                }
+            }
+        }
+    }
+
+    Ok(Some(candidates))
 }
 
 pub fn write(obj: WitObject, actually_write: bool) -> Result<String, Box<WitError>> {

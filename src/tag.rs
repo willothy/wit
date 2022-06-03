@@ -1,5 +1,3 @@
-use std::env;
-
 use crate::{
     object::{Object, WitObject::*, self},
     repository::Repository,
